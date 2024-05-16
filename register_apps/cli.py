@@ -63,6 +63,7 @@ def register_toil(
     bindir = Path(bindir)
     optexe = optdir / pypi_name
     binexe = bindir / f"{pypi_name}_{pypi_version}"
+    workdir = f"{tmpvar}/{pypi_name}_{pypi_version}_`uuidgen`"
     
     image_url = image_url or f"{image_user}/{pypi_name}:{pypi_version}"
     if container == "singularity" and not image_url.startswith("docker://"):
@@ -125,7 +126,7 @@ def register_toil(
     command += [
         " ".join(f"--volumes {i} {j}" for i, j in volumes),
         "--workDir",
-        tmpvar,
+        workdir,
         "\n",
     ]
 
