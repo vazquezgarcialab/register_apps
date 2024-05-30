@@ -111,7 +111,7 @@ TARGET = click.option(
 COMMAND = click.option(
     "--command",
     show_default=True,
-    required=True,
+    default="",
     help="command that will be added at the end of the singularity exec instruction "
     "(e.g. bwa_mem.pl)",
 )
@@ -126,5 +126,18 @@ CONTAINER = click.option(
     show_default=True,
     default="singularity",
     type=click.Choice(["docker", "singularity"]),
-    help="container runtime to be used (docker or singularity)",
+    help="container runtime to be used: docker or singularity.",
+)
+ENVIRONMENT = click.option(
+    "--environment",
+    show_default=True,
+    default="production",
+    type=click.Choice(["production", "development", "testing", "staging"]),
+    help="Development Environment: production, development, testing, or staging.",
+)
+NO_HOME = click.option(
+    "--no-home",
+    is_flag=True,
+    required=False,
+    help="Use singularity --no-home option, to avoid mounting users home directory",
 )

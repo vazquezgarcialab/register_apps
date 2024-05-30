@@ -41,6 +41,7 @@ from register_apps import utils
 @options.SINGULARITY
 @options.VIRTUALENVWRAPPER
 @options.CONTAINER
+@options.ENVIRONMENT
 def register_toil(
     pypi_name,
     pypi_version,
@@ -55,6 +56,7 @@ def register_toil(
     singularity,
     virtualenvwrapper,
     container,
+    environment,
 ):
     """Register versioned toil container pipelines in a bin directory."""
     virtualenvwrapper = shutil.which(virtualenvwrapper)
@@ -80,7 +82,7 @@ def register_toil(
     bindir.mkdir(exist_ok=True, parents=True)
 
     # create virtual environment and install package
-    env = f"production__{pypi_name}__{pypi_version}"
+    env = f"{environment}__{pypi_name}__{pypi_version}"
     click.echo(f"Creating virtual environment '{env}'...")
     subprocess.check_output(
         [
@@ -149,6 +151,7 @@ def register_image(  # pylint: disable=R0913
     image_url,
     image_user,
     image_version,
+    no_home,
     optdir,
     runtime,
     target,
@@ -183,6 +186,7 @@ def register_image(  # pylint: disable=R0913
             "--workdir",
             workdir,
             " ".join(f"--bind {i}:{j}" for i, j in volumes),
+            "--no-home" if no_home else "",
             _get_or_create_image(optdir, runtime, image_url),
             command,
             '"$@"\n',
@@ -206,7 +210,8 @@ def register_image(  # pylint: disable=R0913
 
     # link executables
     click.echo("Creating and linking executable...")
-    optexe.write_text(f"#!/bin/bash\n{' '.join(command)}")
+    command = ' '.join(list(filter(None, command)))
+    optexe.write_text(f"#!/bin/bash\n{command}")
     optexe.chmod(mode=0o755)
     utils.force_symlink(optexe, binexe)
     click.secho(
@@ -229,6 +234,7 @@ def register_image(  # pylint: disable=R0913
 @options.SINGULARITY
 @options.FORCE
 @options.VERSION
+@options.NO_HOME
 def register_singularity(singularity, *args, **kwargs):
     """Register versioned singularity command in a bin directory."""
     register_image(image_type="singularity", runtime=singularity, *args, **kwargs)
@@ -250,7 +256,7 @@ def register_singularity(singularity, *args, **kwargs):
 @options.VERSION
 def register_docker(docker, *args, **kwargs):
     """Register versioned docker command in a bin directory."""
-    register_image(image_type="docker", runtime=docker, *args, **kwargs)
+    register_image(image_type="docker", runtime=docker, no_home=False, *args, **kwargs)
 
 
 @click.command()
@@ -262,7 +268,8 @@ def register_docker(docker, *args, **kwargs):
 @options.PYTHON3
 @options.VERSION
 @options.VIRTUALENVWRAPPER
-def register_python(pypi_name, pypi_version, github_user, bindir, optdir, python, virtualenvwrapper):
+@options.ENVIRONMENT
+def register_python(pypi_name, pypi_version, github_user, bindir, optdir, python, virtualenvwrapper, environment):
     """Register versioned python pipelines in a bin directory."""
     virtualenvwrapper = shutil.which(virtualenvwrapper)
     python = shutil.which(python)
@@ -280,7 +287,7 @@ def register_python(pypi_name, pypi_version, github_user, bindir, optdir, python
     bindir.mkdir(exist_ok=True, parents=True)
 
     # create virtual environment and install package
-    env = f"production__{pypi_name}__{pypi_version}"
+    env = f"{environment}__{pypi_name}__{pypi_version}"
     click.echo(f"Creating virtual environment '{env}'...")
     subprocess.check_output(
         [
