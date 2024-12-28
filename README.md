@@ -139,7 +139,6 @@ This package was created using [Cookiecutter] and the
 [singularity]: http://singularity.lbl.gov/
 [cookiecutter]: https://github.com/audreyr/cookiecutter
 [papaemmelab/cookiecutter-toil]: https://github.com/papaemmelab/cookiecutter-toil
-[`--batchSystem`]: http://toil.readthedocs.io/en/latest/developingWorkflows/batchSystem.html?highlight=BatchSystem
 [docker_base]: https://hub.docker.com/r/papaemmelab/register_apps
 [docker_badge]: https://img.shields.io/docker/cloud/build/papaemmelab/register_apps.svg
 [automated_badge]: https://img.shields.io/docker/cloud/automated/papaemmelab/register_apps.svg
@@ -147,7 +146,7 @@ This package was created using [Cookiecutter] and the
 [codecov_base]: https://codecov.io/gh/papaemmelab/register_apps
 [pypi_badge]: https://img.shields.io/pypi/v/register_apps.svg
 [pypi_base]: https://pypi.org/pypi/register_apps
-[travis_badge]: https://img.shields.io/travis/papaemmelab/register_apps.svg
-[travis_base]: https://travis-ci.org/papaemmelab/register_apps
+[travis_badge]: https://app.travis-ci.com/papaemmelab/register_apps.svg?token=P6GGbmdLPwysz69FFv2X&branch=master
+[travis_base]: https://app.travis-ci.com/papaemmelab/register_apps
 [black_badge]: https://img.shields.io/badge/code%20style-black-000000.svg
 [black_base]: https://github.com/ambv/black

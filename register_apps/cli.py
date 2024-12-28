@@ -263,20 +263,21 @@ def register_docker(docker, *args, **kwargs):
 @options.PYPI_NAME
 @options.PYPI_VERSION
 @options.GITHUB_USER
+@options.COMMAND
 @options.BINDIR
 @options.OPTDIR
 @options.PYTHON3
 @options.VERSION
 @options.VIRTUALENVWRAPPER
 @options.ENVIRONMENT
-def register_python(pypi_name, pypi_version, github_user, bindir, optdir, python, virtualenvwrapper, environment):
+def register_python(pypi_name, pypi_version, github_user, command, bindir, optdir, python, virtualenvwrapper, environment):
     """Register versioned python pipelines in a bin directory."""
     virtualenvwrapper = shutil.which(virtualenvwrapper)
     python = shutil.which(python)
     optdir = Path(optdir) / pypi_name / pypi_version
     bindir = Path(bindir)
     optexe = optdir / pypi_name
-    binexe = bindir / f"{pypi_name}_{pypi_version}"
+    binexe = bindir / command or f"{pypi_name}_{pypi_version}"
 
     # check paths
     assert python, "Could not determine the python path."
@@ -301,12 +302,12 @@ def register_python(pypi_name, pypi_version, github_user, bindir, optdir, python
         install_cmd = (
             f"source {virtualenvwrapper} && workon {env} && "
             f"pip install git+https://github.com/{github_user}/"
-            f"{pypi_name}@{pypi_version}#egg={pypi_name} && which {pypi_name}"
+            f"{pypi_name}@{pypi_version}#egg={pypi_name} && which {command or pypi_name}"
         )
     else:
         install_cmd = (
             f"source {virtualenvwrapper} && workon {env} && "
-            f"pip install {pypi_name}=={pypi_version} && which {pypi_name}"
+            f"pip install {pypi_name}=={pypi_version} && which {command or pypi_name}"
         )
 
     click.echo(f"Installing package with '{install_cmd}'...")
@@ -314,11 +315,11 @@ def register_python(pypi_name, pypi_version, github_user, bindir, optdir, python
     toolpath = toolpath.decode("utf-8").strip().split("\n")[-1]
 
     # build command
-    command = [toolpath, '"$@"', "\n"]
+    cmd = [toolpath, '"$@"', "\n"]
 
     # link executables
     click.echo("Creating and linking executable...")
-    optexe.write_text(f"#!/bin/bash\n{' '.join(command)}")
+    optexe.write_text(f"#!/bin/bash\n{' '.join(cmd)}")
     optexe.chmod(mode=0o755)
     utils.force_symlink(optexe, binexe)
     click.secho(
