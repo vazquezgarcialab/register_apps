@@ -1,7 +1,7 @@
 # Register Apps
 
 [![pypi badge][pypi_badge]][pypi_base]
-[![travis badge][travis_badge]][travis_base]
+[![Tests](https://github.com/papaemmelab/register_apps/actions/workflows/tests.yml/badge.svg)](https://github.com/papaemmelab/register_apps/actions/workflows/tests.yml)
 [![codecov badge][codecov_badge]][codecov_base]
 [![docker badge][docker_badge]][docker_base]
 [![docker badge][automated_badge]][docker_base]
@@ -16,6 +16,34 @@ This package is available at [PyPi][pypi_base]:
     pip install register_apps
     # or with the latest version
     pip install git+https://github.com/papaemmelab/register_apps.git#egg=register_apps
+
+## Development Setup
+
+This project uses [uv](https://github.com/astral-sh/uv) for dependency management and virtual environments.
+
+### Setting up the development environment
+
+Install uv and setup the virtual environment:
+ 
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+./setup_uv_env.sh
+source .venv/bin/activate
+```
+
+### Running Tests
+
+With the virtual environment activated:
+
+```bash
+# Run tests with coverage
+pytest --cov=register_apps --cov-report=term-missing
+# Run linting
+pylint register_apps
+pydocstyle register_apps
+```
+
+Note: Some tests require Docker or Singularity to be installed and running. These tests will be skipped if the required tools are not available.
 
 ## Usage
 
@@ -146,7 +174,5 @@ This package was created using [Cookiecutter] and the
 [codecov_base]: https://codecov.io/gh/papaemmelab/register_apps
 [pypi_badge]: https://img.shields.io/pypi/v/register_apps.svg
 [pypi_base]: https://pypi.org/pypi/register_apps
-[travis_badge]: https://app.travis-ci.com/papaemmelab/register_apps.svg?token=P6GGbmdLPwysz69FFv2X&branch=master
-[travis_base]: https://app.travis-ci.com/papaemmelab/register_apps
 [black_badge]: https://img.shields.io/badge/code%20style-black-000000.svg
 [black_base]: https://github.com/ambv/black
