@@ -7,13 +7,15 @@
 [![docker badge][automated_badge]][docker_base]
 [![code formatting][black_badge]][black_base]
 
-👾 Register versioned [toil container] pipelines, singularity containers, and python packages.
+👾 Register versioned [toil container] pipelines, [singularity] containers, and python packages.
 
 ## Installation
 
 This package is available at [PyPi][pypi_base]:
 
     pip install register_apps
+    # or with the latest version
+    pip install git+https://github.com/papaemmelab/register_apps.git#egg=register_apps
 
 ## Usage
 
@@ -113,6 +115,15 @@ This package it's used to register versionized and containerized applications wi
         #!/bin/bash
         /path/to/.virtualenvs/production__click_annotvcf__v1.0.7/bin/click_annotvcf "$@"
 
+### Environment Variables
+
+Some default values can be set using environment variables:
+
+| Variable | Default value for | Description | Example |
+| --- | --- | --- | --- |
+| `REGISTER_APPS_BIN` | `--bindir` | Path to the directory where the executables symlinks will be created | i.e. `/apps/local/bin` |
+| `REGISTER_APPS_OPT` | `--optdir` | Path to the directory where the containers and scripts will be installed | i.e. `/apps/opt` |
+| `REGISTER_APPS_VOLUMES` | `--volumes` | Comma-separated volumes in the format `{src}:{dst}` or just `{src}` | i.e. `/mnt/data,/scratch,/usr/local/data:/data` will mount in docker as `-v /mnt/data:/mnt/data -v /scratch:/scratch -v /usr/local/data:/data`.|
 
 ## Contributing
 
@@ -126,10 +137,8 @@ This package was created using [Cookiecutter] and the
 [virtual environments]: http://virtualenvwrapper.readthedocs.io/en/latest/
 [toil container]: https://github.com/papaemmelab/toil_container
 [singularity]: http://singularity.lbl.gov/
-[docker2singularity]: https://github.com/singularityware/docker2singularity
 [cookiecutter]: https://github.com/audreyr/cookiecutter
 [papaemmelab/cookiecutter-toil]: https://github.com/papaemmelab/cookiecutter-toil
-[`--batchSystem`]: http://toil.readthedocs.io/en/latest/developingWorkflows/batchSystem.html?highlight=BatchSystem
 [docker_base]: https://hub.docker.com/r/papaemmelab/register_apps
 [docker_badge]: https://img.shields.io/docker/cloud/build/papaemmelab/register_apps.svg
 [automated_badge]: https://img.shields.io/docker/cloud/automated/papaemmelab/register_apps.svg
@@ -137,7 +146,7 @@ This package was created using [Cookiecutter] and the
 [codecov_base]: https://codecov.io/gh/papaemmelab/register_apps
 [pypi_badge]: https://img.shields.io/pypi/v/register_apps.svg
 [pypi_base]: https://pypi.org/pypi/register_apps
-[travis_badge]: https://img.shields.io/travis/papaemmelab/register_apps.svg
-[travis_base]: https://travis-ci.org/papaemmelab/register_apps
+[travis_badge]: https://app.travis-ci.com/papaemmelab/register_apps.svg?token=P6GGbmdLPwysz69FFv2X&branch=master
+[travis_base]: https://app.travis-ci.com/papaemmelab/register_apps
 [black_badge]: https://img.shields.io/badge/code%20style-black-000000.svg
 [black_base]: https://github.com/ambv/black
