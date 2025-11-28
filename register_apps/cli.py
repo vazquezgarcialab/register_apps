@@ -87,12 +87,12 @@ def register_toil(  # pylint: disable=R0917
     optdir.mkdir(exist_ok=True, parents=True)
     bindir.mkdir(exist_ok=True, parents=True)
 
-    # create virtual environment using uv
-    venv_path = optdir / ".venv"
-    click.echo(f"Creating virtual environment at {venv_path}...")
-    utils.create_venv_with_uv(venv_path, python)
+    # create virtual environment using virtualenvwrapper
+    env = f"{environment}__{pypi_name}__{pypi_version}"
+    click.echo(f"Creating virtual environment '{env}'...")
+    utils.create_venv_with_virtualenvwrapper(env, python, environment)
 
-    # Install package using uv
+    # Install package using virtualenvwrapper
     if github_user:
         package_spec = (
             f"git+https://github.com/{github_user}/"
@@ -103,16 +103,16 @@ def register_toil(  # pylint: disable=R0917
 
     click.echo(f"Installing package '{package_spec}'...")
     pre_install_list = list(pre_install) if pre_install else None
-    utils.install_package_with_uv(venv_path, package_spec, pre_install=pre_install_list)
+    utils.install_package_with_virtualenvwrapper(
+        env, package_spec, pre_install=pre_install_list
+    )
 
-    # Verify executable exists in venv
-    utils.find_executable_in_venv(venv_path, pypi_name)
+    # Find executable in virtualenvwrapper
+    toolpath = utils.find_executable_in_virtualenvwrapper(env, pypi_name)
 
-    # build command - use relative path to venv
-    script_dir = '$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)'
-    relative_toolpath = f"{script_dir}/.venv/bin/{pypi_name}"
+    # build command - use absolute path from virtualenvwrapper
     command = [
-        relative_toolpath,
+        toolpath,
         '"$@"',
     ]
 
@@ -225,7 +225,6 @@ def register_image(  # pylint: disable=R0913,R0917
         command = [
             runtime,
             "run",
-            "-it",
             "--rm",
             "-u",
             "$(id -u):$(id -g)",
@@ -332,12 +331,12 @@ def register_python(  # pylint: disable=R0917
     optdir.mkdir(exist_ok=True, parents=True)
     bindir.mkdir(exist_ok=True, parents=True)
 
-    # create virtual environment using uv
-    venv_path = optdir / ".venv"
-    click.echo(f"Creating virtual environment at {venv_path}...")
-    utils.create_venv_with_uv(venv_path, python)
+    # create virtual environment using virtualenvwrapper
+    env = f"{environment}__{pypi_name}__{pypi_version}"
+    click.echo(f"Creating virtual environment '{env}'...")
+    utils.create_venv_with_virtualenvwrapper(env, python, environment)
 
-    # Install package using uv
+    # Install package using virtualenvwrapper
     if github_user:
         package_spec = (
             f"git+https://github.com/{github_user}/"
@@ -348,16 +347,16 @@ def register_python(  # pylint: disable=R0917
 
     click.echo(f"Installing package '{package_spec}'...")
     pre_install_list = list(pre_install) if pre_install else None
-    utils.install_package_with_uv(venv_path, package_spec, pre_install=pre_install_list)
+    utils.install_package_with_virtualenvwrapper(
+        env, package_spec, pre_install=pre_install_list
+    )
 
-    # Verify executable exists in venv
+    # Find executable in virtualenvwrapper
     command_name = command or pypi_name
-    utils.find_executable_in_venv(venv_path, command_name)
+    toolpath = utils.find_executable_in_virtualenvwrapper(env, command_name)
 
-    # build command - use relative path to venv
-    script_dir = '$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)'
-    relative_toolpath = f"{script_dir}/.venv/bin/{command_name}"
-    cmd = [relative_toolpath, '"$@"', "\n"]
+    # build command - use absolute path from virtualenvwrapper
+    cmd = [toolpath, '"$@"', "\n"]
 
     # link executables
     click.echo("Creating and linking executable...")
@@ -416,7 +415,12 @@ def _get_or_create_image(optdir, singularity, image_url):
     is_flag=True,
     help="Continue installing other apps if one fails",
 )
-def install(config_path, filter, dry_run, continue_on_error):
+def install(
+    config_path,
+    filter,
+    dry_run,
+    continue_on_error,
+):
     """Install apps from YAML configuration file."""
     click.echo(f"Loading configuration from {config_path}...")
     cfg = config.load_config(config_path)

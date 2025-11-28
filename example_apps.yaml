@@ -5,7 +5,7 @@
 defaults:
   bindir: /usersoftware/papaemme/isabl/bin
   optdir: /usersoftware/papaemme/isabl/local
-  container_runtime: singularity  # or docker
+  container_runtime: singularity # or docker
   singularity_path: /usr/bin/singularity
   docker_path: docker
   volumes:
@@ -19,7 +19,7 @@ apps:
   # ============================================
   # CONTAINER APPS
   # ============================================
-  
+
   - type: container
     target: mosdepth
     command: mosdepth
@@ -314,7 +314,6 @@ apps:
   # ============================================
   # TOIL APPS
   # ============================================
-
   - type: toil
     pypi_name: toil_battenberg
     pypi_version: v1.0.7
@@ -541,4 +540,3 @@ apps:
   #   pypi_version: v1.4.5
   #   github_user: papaemmelab
   #   python: python3
-

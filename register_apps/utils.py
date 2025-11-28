@@ -3,6 +3,7 @@
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 from pathlib import Path
 
@@ -31,124 +32,187 @@ def tar_dir(output_path, source_dir):
         tar.add(source_dir, arcname=os.path.basename(source_dir))
 
 
-def check_uv_available():
-    """Check if uv is available in PATH."""
-    uv_path = shutil.which("uv")
-    if not uv_path:
-        raise RuntimeError(
-            "uv is not available. Please install uv: "
-            "https://github.com/astral-sh/uv#installation"
-        )
-    return uv_path
+def is_executable_available(executable):
+    """Check if an executable is available in PATH."""
+    return shutil.which(executable) is not None
 
 
-def create_venv_with_uv(venv_path, python_interpreter):
+def get_virtualenvwrapper_script():
     """
-    Create virtual environment using uv.
+    Get the path to virtualenvwrapper.sh script.
 
-    Args:
-        venv_path: Path where the virtual environment will be created.
-        python_interpreter: Python interpreter to use (e.g., 'python3', 'python3.9').
+    Returns:
+        str: Path to virtualenvwrapper.sh script.
 
     Raises:
-        subprocess.CalledProcessError: If uv command fails.
-        RuntimeError: If uv is not available.
+        RuntimeError: If virtualenvwrapper is not found.
     """
-    check_uv_available()
-    venv_path = Path(venv_path)
-    venv_path.parent.mkdir(parents=True, exist_ok=True)
+    # Try common locations
+    possible_paths = [
+        os.getenv("VIRTUALENVWRAPPER_SCRIPT"),
+        "/usr/local/bin/virtualenvwrapper.sh",
+        "/usr/bin/virtualenvwrapper.sh",
+        os.path.expanduser("~/.local/bin/virtualenvwrapper.sh"),
+    ]
+
+    # Also try to find via which
+    if is_executable_available("virtualenvwrapper.sh"):
+        result = subprocess.run(
+            ["which", "virtualenvwrapper.sh"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            possible_paths.insert(0, result.stdout.strip())
+
+    for path in possible_paths:
+        if path and os.path.exists(path):
+            return path
+
+    raise RuntimeError(
+        "virtualenvwrapper is not available. "
+        "Please install virtualenvwrapper and ensure VIRTUALENVWRAPPER_SCRIPT is set."
+    )
+
+
+def is_virtualenvwrapper_configured():
+    """
+    Check if virtualenvwrapper is configured and available.
+
+    Returns:
+        bool: True if virtualenvwrapper is available, False otherwise.
+    """
+    try:
+        script_path = get_virtualenvwrapper_script()
+        # Check if mkvirtualenv is available (it's a shell function)
+        result = subprocess.run(
+            ["/bin/bash", "-c", f"source {script_path} && type mkvirtualenv"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except (RuntimeError, subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+
+
+def create_venv_with_virtualenvwrapper(env_name, python_interpreter, environment="production"):
+    """
+    Create virtual environment using virtualenvwrapper.
+
+    Args:
+        env_name: Name of the virtual environment.
+        python_interpreter: Python interpreter to use (e.g., 'python2', 'python3', 'python2.7').
+        environment: Environment name (default: 'production').
+
+    Raises:
+        RuntimeError: If virtualenvwrapper is not available.
+        subprocess.CalledProcessError: If mkvirtualenv command fails.
+    """
+    virtualenvwrapper_script = get_virtualenvwrapper_script()
+    venv_env = os.environ.copy()
+    venv_env.setdefault("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
+    venv_env["VIRTUALENVWRAPPER_PYTHON"] = sys.executable
+
+    cmd = (
+        f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
+        f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
+        f"source {virtualenvwrapper_script} && "
+        f"mkvirtualenv -p {python_interpreter} {env_name}"
+    )
 
     subprocess.check_output(
-        [
-            "uv",
-            "venv",
-            "--python",
-            python_interpreter,
-            str(venv_path),
-        ],
+        ["/bin/bash", "-c", cmd],
+        env=venv_env,
         stderr=subprocess.STDOUT,
     )
 
 
-def install_package_with_uv(venv_path, package_spec, pre_install=None):
+def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=None):
     """
-    Install package in venv using uv.
+    Install package in virtualenvwrapper environment.
 
     Args:
-        venv_path: Path to the virtual environment.
+        env_name: Name of the virtual environment.
         package_spec: Package specification (e.g., 'package==1.0.0' or
                      'git+https://github.com/user/repo@tag#egg=package').
         pre_install: Optional list of package specs to install before main package.
 
     Raises:
-        subprocess.CalledProcessError: If uv command fails.
-        RuntimeError: If uv is not available.
+        RuntimeError: If virtualenvwrapper is not available.
+        subprocess.CalledProcessError: If pip install command fails.
     """
-    check_uv_available()
-    venv_path = Path(venv_path)
-    python_exe = venv_path / "bin" / "python"
-
-    if not python_exe.exists():
-        raise FileNotFoundError(f"Python executable not found: {python_exe}")
+    virtualenvwrapper_script = get_virtualenvwrapper_script()
+    venv_env = os.environ.copy()
+    venv_env.setdefault("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
+    venv_env["VIRTUALENVWRAPPER_PYTHON"] = sys.executable
 
     # Install pre-install packages if specified
     if pre_install:
         for pre_pkg in pre_install:
+            cmd = (
+                f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
+                f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
+                f"source {virtualenvwrapper_script} && "
+                f"workon {env_name} && pip install {pre_pkg}"
+            )
             subprocess.check_output(
-                [
-                    "uv",
-                    "pip",
-                    "install",
-                    "--python",
-                    str(python_exe),
-                    pre_pkg,
-                ],
+                ["/bin/bash", "-c", cmd],
+                env=venv_env,
                 stderr=subprocess.STDOUT,
             )
 
     # Install main package
+    cmd = (
+        f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
+        f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
+        f"source {virtualenvwrapper_script} && "
+        f"workon {env_name} && pip install {package_spec}"
+    )
     subprocess.check_output(
-        [
-            "uv",
-            "pip",
-            "install",
-            "--python",
-            str(python_exe),
-            package_spec,
-        ],
+        ["/bin/bash", "-c", cmd],
+        env=venv_env,
         stderr=subprocess.STDOUT,
     )
 
 
-def find_executable_in_venv(venv_path, command_name):
+def find_executable_in_virtualenvwrapper(env_name, command_name):
     """
-    Find executable in virtual environment.
+    Find executable in virtualenvwrapper environment.
 
     Args:
-        venv_path: Path to the virtual environment.
+        env_name: Name of the virtual environment.
         command_name: Name of the command/executable to find.
 
     Returns:
-        Path: Path to the executable.
+        str: Path to the executable.
 
     Raises:
+        RuntimeError: If virtualenvwrapper is not available.
         FileNotFoundError: If executable is not found.
     """
-    venv_path = Path(venv_path)
-    exe_path = venv_path / "bin" / command_name
+    virtualenvwrapper_script = get_virtualenvwrapper_script()
+    venv_env = os.environ.copy()
+    venv_env.setdefault("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
+    venv_env["VIRTUALENVWRAPPER_PYTHON"] = sys.executable
 
-    if exe_path.exists():
-        return exe_path
-
-    # Try variations (e.g., with different extensions or prefixes)
-    bin_dir = venv_path / "bin"
-    if bin_dir.exists():
-        # Look for exact match first
-        for pattern in [command_name, f"{command_name}*"]:
-            matches = list(bin_dir.glob(pattern))
-            if matches:
-                return matches[0]
-
-    raise FileNotFoundError(
-        f"Executable '{command_name}' not found in {venv_path}/bin"
+    cmd = (
+        f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
+        f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
+        f"source {virtualenvwrapper_script} && "
+        f"workon {env_name} && which {command_name}"
     )
+
+    try:
+        toolpath = subprocess.check_output(
+            ["/bin/bash", "-c", cmd],
+            env=venv_env,
+            stderr=subprocess.STDOUT,
+        )
+        return toolpath.decode("utf-8").strip()
+    except subprocess.CalledProcessError as e:
+        raise FileNotFoundError(
+            f"Executable '{command_name}' not found in virtualenv '{env_name}'. "
+            f"Error: {e.stdout.decode('utf-8', errors='ignore') if e.stdout else str(e)}"
+        ) from e

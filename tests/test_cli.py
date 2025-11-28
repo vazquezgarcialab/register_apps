@@ -8,6 +8,7 @@ from click.testing import CliRunner
 import pytest
 
 from register_apps import cli
+from register_apps import utils as register_utils
 from tests import utils
 
 
@@ -16,47 +17,27 @@ SKIP_SINGULARITY = pytest.mark.skipif(
     reason="singularity is not available.",
 )
 
+
 SKIP_DOCKER = pytest.mark.skipif(
-    not utils.is_executable_available("docker"), reason="docker is not available."
+    not utils.is_executable_available("docker"), reason="docker is not installed."
 )
 
 
-def is_uv_available():
-    """Check if uv is available."""
-    import shutil
-
-    try:
-        uv_path = shutil.which("uv")
-        if not uv_path:
-            return False
-
-        # Try to run uv --version to verify it works
-        result = subprocess.run(
-            ["uv", "--version"],
-            capture_output=True,
-            timeout=5,
+def _require_virtualenvwrapper():
+    """Require virtualenvwrapper to be available, fail if not."""
+    if not register_utils.is_virtualenvwrapper_configured():
+        pytest.fail(
+            "virtualenvwrapper is not available. "
+            "Please install virtualenvwrapper and ensure it's configured."
         )
-        return result.returncode == 0
-    except (
-        subprocess.TimeoutExpired,
-        subprocess.CalledProcessError,
-        FileNotFoundError,
-    ):
-        return False
-
-
-SKIP_UV = pytest.mark.skipif(
-    not is_uv_available(),
-    reason="uv is not available.",
-)
 
 
 def run_register_container(tmpdir, container_runtime):
     runner = CliRunner()
     optdir = tmpdir.mkdir("opt")
     bindir = tmpdir.mkdir("bin")
-    optexe = optdir.join("docker-pcapcore", "v0.1.1", "bwa_mem.pl")
-    binexe = bindir.join("bwa_mem.pl")
+    optexe = optdir.join("alpine", "latest", "test_cmd")
+    binexe = bindir.join("test_cmd")
     container_cli = (
         cli.register_docker
         if container_runtime == "docker"
@@ -64,15 +45,15 @@ def run_register_container(tmpdir, container_runtime):
     )
 
     args = [
+        "--image_url",
+        "alpine:latest",
         "--image_repository",
-        "docker-pcapcore",
+        "alpine",
         "--image_version",
-        "v0.1.1",
-        "--image_user",
-        "leukgen",
+        "latest",
         "--volumes",
         "/tmp",
-        "/carlos",
+        "/tmp",
         "--optdir",
         optdir.strpath,
         "--bindir",
@@ -80,42 +61,46 @@ def run_register_container(tmpdir, container_runtime):
         "--tmpvar",
         "$TMPDIR",
         "--command",
-        "bwa_mem.pl",
+        "echo",
         "--target",
-        "bwa_mem.pl",
+        "test_cmd",
     ]
     result = runner.invoke(container_cli, args, catch_exceptions=False)
-    if result.exit_code:
-        print(vars(result))
-        pytest.skip(f"Failed to register container: {result.exception}")
+    assert result.exit_code == 0, (
+        f"Failed to register container: {result.exception}\n" f"Output: {result.output}"
+    )
 
     # Check if the executable files were created
-    if not os.path.exists(optexe.strpath) or not os.path.exists(binexe.strpath):
-        pytest.skip("Container registration failed - executables not created")
+    assert os.path.exists(
+        optexe.strpath
+    ), "Container registration failed - optexe not created"
+    assert os.path.exists(
+        binexe.strpath
+    ), "Container registration failed - binexe not created"
 
-    # Try to run the command, but skip if it fails (Docker image might not be available)
+    # Try to run the command - should fail if Docker isn't running or image unavailable
     for i in optexe.strpath, binexe.strpath:
         try:
             output = subprocess.check_output(
-                args=[i, "--version"],
+                args=[i, "test-output"],
                 env={"TMP": "/tmp", "USER": "root"},
                 stderr=subprocess.STDOUT,
                 timeout=10,
             )
-            assert b"4.2.1" in output
+            # Alpine's echo should output the argument
+            assert b"test-output" in output
         except (
             subprocess.CalledProcessError,
             subprocess.TimeoutExpired,
             FileNotFoundError,
         ) as e:
-            pytest.skip(
-                f"Cannot execute container command (image may not be available): {e}"
-            )
+            # Fail if container execution fails - Docker should be running
+            pytest.fail(f"Container command execution failed: {e}. ")
 
     assert (
-        "--volume /tmp:/carlos"
+        "--volume /tmp:/tmp"
         if container_runtime == "docker"
-        else "--bind /tmp:/carlos" in optexe.read()
+        else "--bind /tmp:/tmp" in optexe.read()
     )
     assert "--workdir $TMP" in optexe.read()
     assert not runner.invoke(container_cli, ["--help"]).exit_code
@@ -134,9 +119,9 @@ def test_register_singularity(tmpdir):
 
 
 @SKIP_SINGULARITY
-@SKIP_UV
 def test_register_toil(tmpdir):
     """Sample test for register_toil command."""
+    _require_virtualenvwrapper()
     runner = CliRunner()
     optdir = tmpdir.mkdir("opt")
     bindir = tmpdir.mkdir("bin")
@@ -165,12 +150,17 @@ def test_register_toil(tmpdir):
         ],
     )
 
-    if result.exit_code:
-        print(vars(result))
+    assert result.exit_code == 0, (
+        f"Failed to register toil: {result.exception}\n" f"Output: {result.output}"
+    )
 
-    # Check that .venv directory was created
-    venv_path = optdir.join("toil_container", "v2.0.3", ".venv")
-    assert venv_path.exists(), "Virtual environment not created"
+    # Check that virtualenvwrapper environment was created
+    # Venvs are stored in ~/.virtualenvs/ with name production__toil_container__v2.0.3
+    import os
+
+    workon_home = os.getenv("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
+    venv_path = os.path.join(workon_home, "production__toil_container__v2.0.3")
+    assert os.path.exists(venv_path), f"Virtual environment not created at {venv_path}"
 
     for i in optexe.strpath, binexe.strpath:
         assert b"0.1.2" in subprocess.check_output(
@@ -182,9 +172,9 @@ def test_register_toil(tmpdir):
     assert not runner.invoke(cli.register_toil, ["--help"]).exit_code
 
 
-@SKIP_UV
 def test_register_python(tmpdir):
     """Sample test for register_python command."""
+    _require_virtualenvwrapper()
     runner = CliRunner()
     optdir = tmpdir.mkdir("opt")
     bindir = tmpdir.mkdir("bin")
@@ -202,24 +192,37 @@ def test_register_python(tmpdir):
             "--bindir",
             bindir.strpath,
             "--python",
-            "python3",
+            "python2.7",
         ],
     )
 
-    if result.exit_code:
-        print(vars(result))
-        # If installation failed, skip the test
-        pytest.skip(f"Package installation failed: {result.exception}")
+    if result.exit_code != 0:
+        # Print more detailed error information
+        error_msg = "Package installation failed:\n"
+        error_msg += f"  Exit code: {result.exit_code}\n"
+        if result.exception:
+            error_msg += f"  Exception: {result.exception}\n"
+        error_msg += f"  Output: {result.output}\n"
+        if hasattr(result, "stderr_bytes") and result.stderr_bytes:
+            stderr_text = result.stderr_bytes.decode("utf-8", errors="ignore")
+            error_msg += f"  Stderr: {stderr_text}\n"
+        if hasattr(result, "stdout_bytes") and result.stdout_bytes:
+            stdout_text = result.stdout_bytes.decode("utf-8", errors="ignore")
+            error_msg += f"  Stdout: {stdout_text}\n"
+        pytest.fail(error_msg)
 
-    # Check that .venv directory was created
-    venv_path = optdir.join("toil_container", "v2.0.3", ".venv")
-    assert venv_path.exists(), "Virtual environment not created"
+    # Check that virtualenvwrapper environment was created
+    import os
+
+    workon_home = os.getenv("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
+    venv_path = os.path.join(workon_home, "production__toil_container__v2.0.3")
+    assert os.path.exists(venv_path), f"Virtual environment not created at {venv_path}"
 
     # Check that wrapper script was created
     assert os.path.exists(optexe.strpath), "Wrapper script not created"
     assert os.path.exists(binexe.strpath), "Symlink not created"
 
-    # Try to run the executable, but skip if it fails (package might not be available)
+    # Try to run the executable - should fail if package is not available
     for i in optexe.strpath, binexe.strpath:
         try:
             output = subprocess.check_output(
@@ -233,14 +236,14 @@ def test_register_python(tmpdir):
             subprocess.TimeoutExpired,
             FileNotFoundError,
         ) as e:
-            pytest.skip(f"Cannot execute command (package may not be available): {e}")
+            pytest.fail(f"Cannot execute command (package may not be available): {e}")
 
     assert not runner.invoke(cli.register_python, ["--help"]).exit_code
 
 
-@SKIP_UV
 def test_register_python_github(tmpdir):
     """Sample test for register_python command."""
+    _require_virtualenvwrapper()
     runner = CliRunner()
     optdir = tmpdir.mkdir("opt")
     bindir = tmpdir.mkdir("bin")
@@ -260,24 +263,37 @@ def test_register_python_github(tmpdir):
             "--github_user",
             "papaemmelab",
             "--python",
-            "python3",
+            "python2.7",
         ],
     )
 
-    if result.exit_code:
-        print(vars(result))
-        # If installation failed, skip the test
-        pytest.skip(f"Package installation failed: {result.exception}")
+    if result.exit_code != 0:
+        # Print more detailed error information
+        error_msg = "Package installation failed:\n"
+        error_msg += f"  Exit code: {result.exit_code}\n"
+        if result.exception:
+            error_msg += f"  Exception: {result.exception}\n"
+        error_msg += f"  Output: {result.output}\n"
+        if hasattr(result, "stderr_bytes") and result.stderr_bytes:
+            stderr_text = result.stderr_bytes.decode("utf-8", errors="ignore")
+            error_msg += f"  Stderr: {stderr_text}\n"
+        if hasattr(result, "stdout_bytes") and result.stdout_bytes:
+            stdout_text = result.stdout_bytes.decode("utf-8", errors="ignore")
+            error_msg += f"  Stdout: {stdout_text}\n"
+        pytest.fail(error_msg)
 
-    # Check that .venv directory was created
-    venv_path = optdir.join("toil_container", "v2.0.3", ".venv")
-    assert venv_path.exists(), "Virtual environment not created"
+    # Check that virtualenvwrapper environment was created
+    import os
+
+    workon_home = os.getenv("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
+    venv_path = os.path.join(workon_home, "production__toil_container__v2.0.3")
+    assert os.path.exists(venv_path), f"Virtual environment not created at {venv_path}"
 
     # Check that wrapper script was created
     assert os.path.exists(optexe.strpath), "Wrapper script not created"
     assert os.path.exists(binexe.strpath), "Symlink not created"
 
-    # Try to run the executable, but skip if it fails (package might not be available)
+    # Try to run the executable - should fail if package is not available
     for i in optexe.strpath, binexe.strpath:
         try:
             output = subprocess.check_output(
@@ -291,6 +307,6 @@ def test_register_python_github(tmpdir):
             subprocess.TimeoutExpired,
             FileNotFoundError,
         ) as e:
-            pytest.skip(f"Cannot execute command (package may not be available): {e}")
+            pytest.fail(f"Cannot execute command (package may not be available): {e}")
 
     assert not runner.invoke(cli.register_python, ["--help"]).exit_code

@@ -27,7 +27,8 @@
     "setup_requires": [],
     "install_requires": [
         "click>=7.0.0",
-        "pyyaml>=6.0"
+        "pyyaml>=6.0",
+        "virtualenvwrapper>=4.8.4"
     ],
     "extras_require": {
         "test": [
