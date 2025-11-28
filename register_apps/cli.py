@@ -19,6 +19,7 @@ from pathlib import Path
 import os
 import shutil
 import subprocess
+import sys
 
 import click
 
@@ -82,12 +83,22 @@ def register_toil(  # pylint: disable=R0917
     # create virtual environment and install package
     env = f"{environment}__{pypi_name}__{pypi_version}"
     click.echo(f"Creating virtual environment '{env}'...")
+    # Set up environment variables for virtualenvwrapper
+    venv_env = os.environ.copy()
+    venv_env.setdefault("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
+    # VIRTUALENVWRAPPER_PYTHON should be the Python that has virtualenvwrapper installed
+    # (sys.executable), not the Python used to create the new venv
+    if not venv_env.get("VIRTUALENVWRAPPER_PYTHON"):
+        venv_env["VIRTUALENVWRAPPER_PYTHON"] = sys.executable
     subprocess.check_output(
         [
             "/bin/bash",
             "-c",
+            f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
+            f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
             f"source {virtualenvwrapper} && mkvirtualenv -p {python} {env}",
-        ]
+        ],
+        env=venv_env,
     )
 
     if github_user:
@@ -103,7 +114,7 @@ def register_toil(  # pylint: disable=R0917
         )
 
     click.echo(f"Installing package with '{install_cmd}'...")
-    toolpath = subprocess.check_output(["/bin/bash", "-c", install_cmd])
+    toolpath = subprocess.check_output(["/bin/bash", "-c", install_cmd], env=venv_env)
     toolpath = toolpath.decode("utf-8").strip().rsplit("\n", maxsplit=1)[-1]
 
     # build command
@@ -326,12 +337,22 @@ def register_python(  # pylint: disable=R0917
     # create virtual environment and install package
     env = f"{environment}__{pypi_name}__{pypi_version}"
     click.echo(f"Creating virtual environment '{env}'...")
+    # Set up environment variables for virtualenvwrapper
+    venv_env = os.environ.copy()
+    venv_env.setdefault("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
+    # VIRTUALENVWRAPPER_PYTHON should be the Python that has virtualenvwrapper installed
+    # (sys.executable), not the Python used to create the new venv
+    if not venv_env.get("VIRTUALENVWRAPPER_PYTHON"):
+        venv_env["VIRTUALENVWRAPPER_PYTHON"] = sys.executable
     subprocess.check_output(
         [
             "/bin/bash",
             "-c",
+            f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
+            f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
             f"source {virtualenvwrapper} && mkvirtualenv -p {python} {env}",
-        ]
+        ],
+        env=venv_env,
     )
 
     if github_user:
@@ -347,7 +368,7 @@ def register_python(  # pylint: disable=R0917
         )
 
     click.echo(f"Installing package with '{install_cmd}'...")
-    toolpath = subprocess.check_output(["/bin/bash", "-c", install_cmd])
+    toolpath = subprocess.check_output(["/bin/bash", "-c", install_cmd], env=venv_env)
     toolpath = toolpath.decode("utf-8").strip().rsplit("\n", maxsplit=1)[-1]
 
     # build command

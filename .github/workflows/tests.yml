@@ -34,6 +34,20 @@ jobs:
           source .venv/bin/activate
           uv pip install -e ".[test]"
 
+      - name: Set up virtualenvwrapper
+        run: |
+          source .venv/bin/activate
+          # Find virtualenvwrapper.sh location (it's installed in .venv/bin/)
+          VIRTUALENVWRAPPER_SH="$(pwd)/.venv/bin/virtualenvwrapper.sh"
+          echo "VIRTUALENVWRAPPER_SH=$VIRTUALENVWRAPPER_SH" >> $GITHUB_ENV
+          # Set up virtualenvwrapper environment variables
+          echo "WORKON_HOME=$HOME/.virtualenvs" >> $GITHUB_ENV
+          echo "VIRTUALENVWRAPPER_PYTHON=$(which python)" >> $GITHUB_ENV
+          mkdir -p $HOME/.virtualenvs
+          # Make virtualenvwrapper.sh executable and add to PATH
+          chmod +x "$VIRTUALENVWRAPPER_SH"
+          echo "$(pwd)/.venv/bin" >> $GITHUB_PATH
+
       - name: Run tests
         run: |
           source .venv/bin/activate

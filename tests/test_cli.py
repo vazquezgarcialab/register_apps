@@ -1,4 +1,5 @@
 """register_apps cli tests."""
+
 # pylint: disable=E1135
 import os
 import subprocess
@@ -11,35 +12,54 @@ from tests import utils
 
 
 SKIP_SINGULARITY = pytest.mark.skipif(
-    not utils.is_executable_available("singularity"), reason="singularity is not available."
+    not utils.is_executable_available("singularity"),
+    reason="singularity is not available.",
 )
 
 SKIP_DOCKER = pytest.mark.skipif(
     not utils.is_executable_available("docker"), reason="docker is not available."
 )
 
+
 def is_virtualenvwrapper_configured():
     """Check if virtualenvwrapper is properly configured."""
+    import os
     import shutil
     import subprocess
+
     try:
         virtualenvwrapper = shutil.which("virtualenvwrapper.sh")
         if not virtualenvwrapper:
             return False
-        # Try to source it and check if mkvirtualenv is available
+
+        # Set up environment variables needed by virtualenvwrapper
+        env = os.environ.copy()
+        env.setdefault("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
+        python_path = shutil.which("python3") or shutil.which("python")
+        if python_path:
+            env["VIRTUALENVWRAPPER_PYTHON"] = python_path
+
+        # Try to source it and check if mkvirtualenv is available (it's a function, not an executable)
         result = subprocess.run(
-            ["/bin/bash", "-c", f"source {virtualenvwrapper} && which mkvirtualenv"],
+            ["/bin/bash", "-c", f"source {virtualenvwrapper} && type mkvirtualenv"],
             capture_output=True,
-            timeout=5
+            timeout=5,
+            env=env,
         )
         return result.returncode == 0
-    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+    except (
+        subprocess.TimeoutExpired,
+        subprocess.CalledProcessError,
+        FileNotFoundError,
+    ):
         return False
+
 
 SKIP_VIRTUALENVWRAPPER = pytest.mark.skipif(
     not is_virtualenvwrapper_configured(),
-    reason="virtualenvwrapper is not properly configured."
+    reason="virtualenvwrapper is not properly configured.",
 )
+
 
 def run_register_container(tmpdir, container_runtime):
     runner = CliRunner()
@@ -47,7 +67,11 @@ def run_register_container(tmpdir, container_runtime):
     bindir = tmpdir.mkdir("bin")
     optexe = optdir.join("docker-pcapcore", "v0.1.1", "bwa_mem.pl")
     binexe = bindir.join("bwa_mem.pl")
-    container_cli = cli.register_docker if container_runtime == "docker" else cli.register_singularity 
+    container_cli = (
+        cli.register_docker
+        if container_runtime == "docker"
+        else cli.register_singularity
+    )
 
     args = [
         "--image_repository",
@@ -86,13 +110,23 @@ def run_register_container(tmpdir, container_runtime):
                 args=[i, "--version"],
                 env={"TMP": "/tmp", "USER": "root"},
                 stderr=subprocess.STDOUT,
-                timeout=10
+                timeout=10,
             )
             assert b"4.2.1" in output
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as e:
-            pytest.skip(f"Cannot execute container command (image may not be available): {e}")
+        except (
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
+            FileNotFoundError,
+        ) as e:
+            pytest.skip(
+                f"Cannot execute container command (image may not be available): {e}"
+            )
 
-    assert "--volume /tmp:/carlos" if container_runtime == "docker" else "--bind /tmp:/carlos" in optexe.read()
+    assert (
+        "--volume /tmp:/carlos"
+        if container_runtime == "docker"
+        else "--bind /tmp:/carlos" in optexe.read()
+    )
     assert "--workdir $TMP" in optexe.read()
     assert not runner.invoke(container_cli, ["--help"]).exit_code
 
@@ -221,4 +255,3 @@ def test_register_python_github(tmpdir):
             args=[i, "--version"], stderr=subprocess.STDOUT
         )
     assert not runner.invoke(cli.register_python, ["--help"]).exit_code
-
