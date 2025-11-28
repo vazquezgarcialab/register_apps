@@ -174,28 +174,28 @@ def register_toil(  # pylint: disable=R0917
 
     # Find executable and build command
     toolpath = utils.find_executable_in_virtualenvwrapper(env, pypi_name)
-    command = [toolpath, '"$@"']
+    command_parts = [toolpath]
 
     if container == "singularity":
-        command.extend(
+        command_parts.extend(
             [
                 "--singularity",
                 _get_or_create_image(optdir, singularity, image_url),
             ]
         )
     else:  # docker
-        command.extend(["--docker", image_url])
+        command_parts.extend(["--docker", image_url])
 
-    command.extend(
+    command_parts.extend(
         [
             " ".join(f"--volumes {i} {j}" for i, j in volumes),
             "--workDir",
             workdir,
-            "\n",
+            '"$@"',
         ]
     )
 
-    _create_executable(optexe, binexe, command)
+    _create_executable(optexe, binexe, command_parts)
 
 
 def register_image(  # pylint: disable=R0913,R0917
@@ -268,11 +268,10 @@ def register_image(  # pylint: disable=R0913,R0917
             "--workdir",
             workdir,
             " ".join(f"--bind {i}:{j}" for i, j in volumes),
-            "--no-home" if no_home else "",
-            image_path,
-            command,
-            '"$@"\n',
         ]
+        if no_home:
+            command_parts.append("--no-home")
+        command_parts.extend([image_path, command, '"$@"'])
     else:  # docker
         command_parts = [
             runtime,
@@ -283,11 +282,10 @@ def register_image(  # pylint: disable=R0913,R0917
             "--workdir",
             workdir,
             " ".join(f"--volume {i}:{j}" for i, j in volumes),
-            "--entrypoint ''" if command else "",
-            image_url,
-            command,
-            '"$@"\n',
         ]
+        if command:
+            command_parts.append("--entrypoint ''")
+        command_parts.extend([image_url, command, '"$@"'])
 
     command_str = " ".join(filter(None, command_parts))
     _create_executable(optexe, binexe, [command_str])
@@ -390,29 +388,7 @@ def register_python(  # pylint: disable=R0917
 
     # Find executable and create script
     command_name = command or pypi_name
-    try:
-        toolpath = utils.find_executable_in_virtualenvwrapper(env, command_name)
-        if not toolpath or not toolpath.strip():
-            raise FileNotFoundError(
-                f"Executable '{command_name}' not found in virtualenv '{env}'. "
-                f"'which {command_name}' returned empty output."
-            )
-    except FileNotFoundError:
-        # If command not found, try to use Python module execution as fallback
-        # Check if package can be imported
-        python_exe = utils.find_executable_in_virtualenvwrapper(env, "python")
-        if not python_exe:
-            raise click.ClickException(
-                f"Executable '{command_name}' not found in virtualenv '{env}' "
-                f"and Python executable not available. "
-                f"Please ensure the package provides a '{command_name}' command."
-            )
-        # Use python -m <package> as fallback
-        toolpath = f"{python_exe} -m {pypi_name}"
-        click.echo(
-            f"Command '{command_name}' not found, "
-            f"using 'python -m {pypi_name}' as fallback"
-        )
+    toolpath = utils.find_executable_in_virtualenvwrapper(env, command_name)
     cmd = [toolpath, '"$@"']
 
     _create_executable(optexe, binexe, cmd)

@@ -117,15 +117,13 @@ def create_venv_with_virtualenvwrapper(
     Create virtual environment using virtualenvwrapper.
 
     Args:
-        env_name: Name of the virtual environment (should include environment prefix).
+        env_name: Name of the virtual environment.
         python_interpreter: Python interpreter to use (e.g., 'python3', 'python2.7').
-        environment: Environment name (default: 'production'). Used for validation
-                     to ensure env_name follows the expected pattern.
+        environment: Environment name (default: 'production').
 
     Raises:
         RuntimeError: If virtualenvwrapper is not available.
         subprocess.CalledProcessError: If mkvirtualenv command fails.
-        ValueError: If env_name doesn't start with expected environment prefix.
     """
     virtualenvwrapper_script = get_virtualenvwrapper_script()
     cmd = _build_virtualenvwrapper_cmd(
