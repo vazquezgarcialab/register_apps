@@ -522,62 +522,56 @@ def install_container_app(app_config: Dict[str, Any]) -> None:  # type: ignore
     runtime_type = app_config.get("container_runtime", "singularity")
     runtime_path = app_config.get(f"{runtime_type}_path", runtime_type)
 
-    kwargs = {
-        "bindir": app_config["bindir"],
-        "optdir": app_config["optdir"],
-        "target": app_config.get("target"),
-        "command": app_config.get("command", ""),
-        "image_repository": app_config.get("image_repository"),
-        "image_version": app_config.get("image_version"),
-        "image_url": app_config.get("image_url"),
-        "image_user": app_config.get("image_user"),
-        "force": app_config.get("force", False),
-        "tmpvar": app_config.get("tmpvar", "$TMP_DIR"),
-        "volumes": app_config.get("volumes", []),
-        "runtime": runtime_path,
-        "image_type": runtime_type,
-        "no_home": app_config.get("no_home", False),
-    }
-
-    register_image(**{k: v for k, v in kwargs.items() if v is not None})
+    register_image(
+        bindir=app_config["bindir"],
+        optdir=app_config["optdir"],
+        target=app_config.get("target"),
+        command=app_config.get("command", ""),
+        image_repository=app_config.get("image_repository"),
+        image_version=app_config.get("image_version"),
+        image_url=app_config.get("image_url"),
+        image_user=app_config.get("image_user"),
+        force=app_config.get("force", False),
+        tmpvar=app_config.get("tmpvar", "$TMP_DIR"),
+        volumes=app_config.get("volumes", []),
+        runtime=runtime_path,
+        image_type=runtime_type,
+        no_home=app_config.get("no_home", False),
+    )
 
 
 def install_toil_app(app_config: Dict[str, Any]) -> None:  # type: ignore
     """Install a toil app."""
-    kwargs = {
-        "bindir": app_config["bindir"],
-        "optdir": app_config["optdir"],
-        "pypi_name": app_config["pypi_name"],
-        "pypi_version": app_config["pypi_version"],
-        "image_url": app_config.get("image_url"),
-        "github_user": app_config.get("github_user"),
-        "python": app_config.get("python", "python3"),
-        "container": app_config.get("container", "singularity"),
-        "singularity": app_config.get("singularity_path", "singularity"),
-        "docker": app_config.get("docker_path", "docker"),
-        "tmpvar": app_config.get("tmpvar", "$TMP_DIR"),
-        "volumes": app_config.get("volumes", []),
-        "environment": app_config.get("environment", "production"),
-        "force": app_config.get("force", False),
-        "pre_install": app_config.get("pre_install"),
-    }
-
-    register_toil(**{k: v for k, v in kwargs.items() if v is not None})
+    register_toil(
+        bindir=app_config["bindir"],
+        optdir=app_config["optdir"],
+        pypi_name=app_config["pypi_name"],
+        pypi_version=app_config["pypi_version"],
+        image_url=app_config.get("image_url"),
+        github_user=app_config.get("github_user"),
+        python=app_config.get("python", "python3"),
+        container=app_config.get("container", "singularity"),
+        singularity=app_config.get("singularity_path", "singularity"),
+        docker=app_config.get("docker_path", "docker"),
+        tmpvar=app_config.get("tmpvar", "$TMP_DIR"),
+        volumes=app_config.get("volumes", []),
+        environment=app_config.get("environment", "development"),
+        force=app_config.get("force", False),
+        pre_install=app_config.get("pre_install"),
+    )
 
 
 def install_python_app(app_config: Dict[str, Any]) -> None:  # type: ignore
     """Install a python app."""
-    kwargs = {
-        "bindir": app_config["bindir"],
-        "optdir": app_config["optdir"],
-        "pypi_name": app_config["pypi_name"],
-        "pypi_version": app_config["pypi_version"],
-        "github_user": app_config.get("github_user"),
-        "command": app_config.get("command"),
-        "python": app_config.get("python", "python3"),
-        "environment": app_config.get("environment", "production"),
-        "force": app_config.get("force", False),
-        "pre_install": app_config.get("pre_install"),
-    }
-
-    register_python(**{k: v for k, v in kwargs.items() if v is not None})
+    register_python(
+        bindir=app_config["bindir"],
+        optdir=app_config["optdir"],
+        pypi_name=app_config["pypi_name"],
+        pypi_version=app_config["pypi_version"],
+        github_user=app_config.get("github_user"),
+        command=app_config.get("command"),
+        python=app_config.get("python", "python3"),
+        environment=app_config.get("environment", "development"),
+        force=app_config.get("force", False),
+        pre_install=app_config.get("pre_install"),
+    )

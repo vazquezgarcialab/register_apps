@@ -60,6 +60,9 @@ setup(
     name="register_apps",
     test_suite="tests",
     long_description="📘 learn more on `GitHub <https://github.com/papaemmelab/register_apps>`_!",
-    description="👾 Register versioned toil container pipelines and other commands in singularity containers.",
+    description=(
+        "👾 Register versioned toil container pipelines and other "
+        "commands in singularity containers and python packages."
+    ),
     url="https://github.com/papaemmelab/register_apps",
 )
