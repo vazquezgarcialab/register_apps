@@ -21,16 +21,14 @@ pip install git+https://github.com/papaemmelab/register_apps.git#egg=register_ap
 
 ## Development Setup
 
-This project uses [uv](https://github.com/astral-sh/uv) for dependency management and virtual environments.
-
 ### Setting up the development environment
 
-Install uv and setup the virtual environment:
+Create a virtual environment and install dependencies:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-./setup_uv_env.sh
+python3 -m venv .venv
 source .venv/bin/activate
+pip install -e ".[test]"
 ```
 
 ### Running Tests
@@ -58,14 +56,11 @@ This package is used to register versionized and containerized applications with
 
 ⚠️ **WARNING:** This package only works with singularity 2.4+
 
-⚠️ **NOTE:** This package requires [uv](https://github.com/astral-sh/uv) to be installed for managing virtual environments. Install it with:
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+⚠️ **NOTE:** This package requires `virtualenvwrapper` to be installed and configured for managing virtual environments.
 
 ### Register a toil containerized application
 
-* 🍡 **`register_toil`** will install [toil container] pipelines in separate virtual environments (using `uv`), pull a singularity image from the dockerhub and create executables that call the pipeline with the right parameters:
+* 🍡 **`register_toil`** will install [toil container] pipelines in separate virtual environments (using `virtualenvwrapper`), pull a singularity image from the dockerhub and create executables that call the pipeline with the right parameters:
 
 ```bash
 register_toil \
@@ -144,7 +139,7 @@ singularity exec \
     /example/opt/docker-svaba/v1.0.0/docker-svaba-v1.0.0.simg svaba "$@"
 ```
 
-* 🐍 **`register_python`** provides a method to register python packages without registering to run inside a container. It will create a similar versionized directory structure and install the python package and its dependencies within a virtual environment (using `uv`):
+* 🐍 **`register_python`** provides a method to register python packages without registering to run inside a container. It will create a similar versionized directory structure and install the python package and its dependencies within a virtual environment (using `virtualenvwrapper`):
 
 ```bash
 register_python \
