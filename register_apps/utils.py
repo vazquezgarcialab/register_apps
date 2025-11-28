@@ -5,6 +5,10 @@ import shutil
 import subprocess
 import sys
 import tarfile
+from pathlib import Path
+from typing import List, Tuple, Union, Optional
+
+import click
 
 
 def force_link(src, dst):
@@ -216,3 +220,117 @@ def find_executable_in_virtualenvwrapper(env_name, command_name):
             f"Executable '{command_name}' not found in virtualenv '{env_name}'. "
             f"Error: {error_msg}"
         ) from e
+
+
+def normalize_volumes(volumes: Union[List[str], List[Tuple[str, str]], None]) -> List[Tuple[str, str]]:
+    """
+    Normalize volumes from YAML config to list of tuples.
+
+    Handles volumes in different formats:
+    - List of strings like ["/data1:/data1", "/data2:/data2"]
+    - List of tuples like [("/data1", "/data1"), ("/data2", "/data2")]
+    - None or empty list -> returns empty list
+
+    Args:
+        volumes: Volumes from config (can be strings or tuples).
+
+    Returns:
+        List of (source, destination) tuples.
+    """
+    if not volumes:
+        return []
+
+    normalized = []
+    for vol in volumes:
+        if isinstance(vol, str):
+            # Handle string format like "/data1:/data1" or "/data1"
+            if ":" in vol:
+                parts = vol.split(":", 1)  # Split only on first colon
+                normalized.append((parts[0], parts[1]))
+            else:
+                # If no colon, map to itself
+                normalized.append((vol, vol))
+        elif isinstance(vol, (list, tuple)) and len(vol) == 2:
+            # Already a tuple/list with 2 elements
+            normalized.append((vol[0], vol[1]))
+        else:
+            raise ValueError(f"Invalid volume format: {vol}. Expected string 'src:dest' or tuple (src, dest)")
+
+    return normalized
+
+
+def normalize_image_url(
+    image_url: Optional[str],
+    image_type: str,
+    image_user: str,
+    image_repository: str,
+    image_version: str,
+) -> str:
+    """
+    Normalize image URL based on container type.
+
+    Args:
+        image_url: Existing image URL or None.
+        image_type: Container type ('docker' or 'singularity').
+        image_user: Docker hub user/organization.
+        image_repository: Docker repository name.
+        image_version: Image version tag.
+
+    Returns:
+        str: Normalized image URL.
+    """
+    if not image_url:
+        image_url = f"{image_user}/{image_repository}:{image_version}"
+
+    if image_type == "singularity" and not image_url.startswith("docker://"):
+        image_url = f"docker://{image_url}"
+    elif image_type == "docker" and image_url.startswith("docker://"):
+        image_url = image_url.replace("docker://", "")
+
+    return image_url
+
+
+def build_package_spec(pypi_name: str, pypi_version: str, github_user: Optional[str]) -> str:
+    """
+    Build package specification string.
+
+    Args:
+        pypi_name: Package name.
+        pypi_version: Package version.
+        github_user: GitHub user (optional).
+
+    Returns:
+        str: Package specification.
+    """
+    if github_user:
+        return (
+            f"git+https://github.com/{github_user}/"
+            f"{pypi_name}@{pypi_version}#egg={pypi_name}"
+        )
+    return f"{pypi_name}=={pypi_version}"
+
+
+def create_executable(optexe: Path, binexe: Path, command_parts: List[str]) -> None:
+    """
+    Create executable script and symlink.
+
+    Args:
+        optexe: Path to the executable script.
+        binexe: Path to the symlink.
+        command_parts: List of command parts to join.
+
+    Raises:
+        click.ClickException: If file operations fail.
+    """
+    click.echo("Creating and linking executable...")
+    try:
+        script_content = f"#!/bin/bash\n{' '.join(str(part) for part in command_parts)}"
+        optexe.write_text(script_content)
+        optexe.chmod(mode=0o755)
+        force_symlink(optexe, binexe)
+        click.secho(
+            f"\nExecutables available at:\n" f"\n\t{str(optexe)}\n\t{str(binexe)}\n",
+            fg="green",
+        )
+    except OSError as e:
+        raise click.ClickException(f"Failed to create executable: {e}") from e

@@ -28,79 +28,6 @@ from register_apps import options
 from register_apps import utils
 
 
-def _normalize_image_url(
-    image_url, image_type, image_user, image_repository, image_version
-):
-    """
-    Normalize image URL based on container type.
-
-    Args:
-        image_url: Existing image URL or None.
-        image_type: Container type ('docker' or 'singularity').
-        image_user: Docker hub user/organization.
-        image_repository: Docker repository name.
-        image_version: Image version tag.
-
-    Returns:
-        str: Normalized image URL.
-    """
-    if not image_url:
-        image_url = f"{image_user}/{image_repository}:{image_version}"
-
-    if image_type == "singularity" and not image_url.startswith("docker://"):
-        image_url = f"docker://{image_url}"
-    elif image_type == "docker" and image_url.startswith("docker://"):
-        image_url = image_url.replace("docker://", "")
-
-    return image_url
-
-
-def _build_package_spec(pypi_name, pypi_version, github_user):
-    """
-    Build package specification string.
-
-    Args:
-        pypi_name: Package name.
-        pypi_version: Package version.
-        github_user: GitHub user (optional).
-
-    Returns:
-        str: Package specification.
-    """
-    if github_user:
-        return (
-            f"git+https://github.com/{github_user}/"
-            f"{pypi_name}@{pypi_version}#egg={pypi_name}"
-        )
-    return f"{pypi_name}=={pypi_version}"
-
-
-def _create_executable(optexe, binexe, command_parts):
-    """
-    Create executable script and symlink.
-
-    Args:
-        optexe: Path to the executable script.
-        binexe: Path to the symlink.
-        command_parts: List of command parts to join.
-
-    Raises:
-        OSError: If file operations fail.
-    """
-    click.echo("Creating and linking executable...")
-    try:
-        script_content = f"#!/bin/bash\n{' '.join(str(part) for part in command_parts)}"
-        optexe.write_text(script_content)
-        optexe.chmod(mode=0o755)
-        utils.force_symlink(optexe, binexe)
-        click.secho(
-            f"\nExecutables available at:\n" f"\n\t{str(optexe)}\n\t{str(binexe)}\n",
-            fg="green",
-        )
-    except OSError as e:
-        raise click.ClickException(f"Failed to create executable: {e}") from e
-
-
 @click.command()
 @options.PYPI_NAME
 @options.PYPI_VERSION
@@ -140,6 +67,9 @@ def register_toil(  # pylint: disable=R0917
     pre_install,
 ):
     """Register versioned toil container pipelines in a bin directory."""
+    # Normalize volumes to ensure they're in tuple format
+    volumes = utils.normalize_volumes(volumes)
+
     python = shutil.which(python)
     if not python:
         raise click.ClickException("Could not determine the python path.")
@@ -151,7 +81,7 @@ def register_toil(  # pylint: disable=R0917
     workdir = f"{tmpvar}/{pypi_name}_{pypi_version}_`uuidgen`"
 
     # Normalize image URL
-    image_url = _normalize_image_url(
+    image_url = utils.normalize_image_url(
         image_url, container, image_user, pypi_name, pypi_version
     )
 
@@ -165,7 +95,7 @@ def register_toil(  # pylint: disable=R0917
     utils.create_venv_with_virtualenvwrapper(env, python, environment)
 
     # Install package
-    package_spec = _build_package_spec(pypi_name, pypi_version, github_user)
+    package_spec = utils.build_package_spec(pypi_name, pypi_version, github_user)
     click.echo(f"Installing package '{package_spec}'...")
     pre_install_list = list(pre_install) if pre_install else None
     utils.install_package_with_virtualenvwrapper(
@@ -195,7 +125,7 @@ def register_toil(  # pylint: disable=R0917
         ]
     )
 
-    _create_executable(optexe, binexe, command_parts)
+    utils.create_executable(optexe, binexe, command_parts)
 
 
 def register_image(  # pylint: disable=R0913,R0917
@@ -240,6 +170,9 @@ def register_image(  # pylint: disable=R0913,R0917
     Raises:
         click.UsageError: If targets already exist and force is False.
     """
+    # Normalize volumes to ensure they're in tuple format
+    volumes = utils.normalize_volumes(volumes)
+
     optdir = Path(optdir) / image_repository / image_version
     bindir = Path(bindir)
     optexe = optdir / target
@@ -247,7 +180,7 @@ def register_image(  # pylint: disable=R0913,R0917
     workdir = f"{tmpvar}/${{USER}}_{image_repository}_{image_version}_`uuidgen`"
 
     # Normalize image URL
-    image_url = _normalize_image_url(
+    image_url = utils.normalize_image_url(
         image_url, image_type, image_user, image_repository, image_version
     )
 
@@ -288,7 +221,7 @@ def register_image(  # pylint: disable=R0913,R0917
         command_parts.extend([image_url, command, '"$@"'])
 
     command_str = " ".join(filter(None, command_parts))
-    _create_executable(optexe, binexe, [command_str])
+    utils.create_executable(optexe, binexe, [command_str])
 
 
 @click.command()
@@ -379,7 +312,7 @@ def register_python(  # pylint: disable=R0917
     utils.create_venv_with_virtualenvwrapper(env, python, environment)
 
     # Install package
-    package_spec = _build_package_spec(pypi_name, pypi_version, github_user)
+    package_spec = utils.build_package_spec(pypi_name, pypi_version, github_user)
     click.echo(f"Installing package '{package_spec}'...")
     pre_install_list = list(pre_install) if pre_install else None
     utils.install_package_with_virtualenvwrapper(
@@ -391,7 +324,7 @@ def register_python(  # pylint: disable=R0917
     toolpath = utils.find_executable_in_virtualenvwrapper(env, command_name)
     cmd = [toolpath, '"$@"']
 
-    _create_executable(optexe, binexe, cmd)
+    utils.create_executable(optexe, binexe, cmd)
 
 
 def _get_or_create_image(optdir, singularity, image_url):
