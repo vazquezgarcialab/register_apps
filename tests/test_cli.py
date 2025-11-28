@@ -178,21 +178,22 @@ def test_register_python(tmpdir):
     runner = CliRunner()
     optdir = tmpdir.mkdir("opt")
     bindir = tmpdir.mkdir("bin")
-    optexe = optdir.join("toil_container", "v2.0.3", "toil_container")
-    binexe = bindir.join("toil_container_v2.0.3")
+    # Use 'black' which is a code formatter tool with a CLI command
+    optexe = optdir.join("black", "23.12.1", "black")
+    binexe = bindir.join("black_23.12.1")
     result = runner.invoke(
         cli.register_python,
         [
             "--pypi_name",
-            "toil_container",
+            "black",
             "--pypi_version",
-            "v2.0.3",
+            "23.12.1",
             "--optdir",
             optdir.strpath,
             "--bindir",
             bindir.strpath,
             "--python",
-            "python2.7",
+            "python3",
         ],
     )
 
@@ -215,14 +216,19 @@ def test_register_python(tmpdir):
     import os
 
     workon_home = os.getenv("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
-    venv_path = os.path.join(workon_home, "production__toil_container__v2.0.3")
+    venv_path = os.path.join(workon_home, "production__black__23.12.1")
     assert os.path.exists(venv_path), f"Virtual environment not created at {venv_path}"
 
     # Check that wrapper script was created
     assert os.path.exists(optexe.strpath), "Wrapper script not created"
     assert os.path.exists(binexe.strpath), "Symlink not created"
 
-    # Try to run the executable - should fail if package is not available
+    # Verify the script content is correct
+    script_content = optexe.read()
+    assert "#!/bin/bash" in script_content
+    assert "black" in script_content
+
+    # Try to run the executable to verify it works
     for i in optexe.strpath, binexe.strpath:
         try:
             output = subprocess.check_output(
@@ -230,7 +236,7 @@ def test_register_python(tmpdir):
                 stderr=subprocess.STDOUT,
                 timeout=10,
             )
-            assert b"0.1.1" in output
+            assert b"black" in output.lower() or b"23.12" in output
         except (
             subprocess.CalledProcessError,
             subprocess.TimeoutExpired,
@@ -242,28 +248,29 @@ def test_register_python(tmpdir):
 
 
 def test_register_python_github(tmpdir):
-    """Sample test for register_python command."""
+    """Sample test for register_python command with GitHub source."""
     _require_virtualenvwrapper()
     runner = CliRunner()
     optdir = tmpdir.mkdir("opt")
     bindir = tmpdir.mkdir("bin")
-    optexe = optdir.join("toil_container", "v2.0.3", "toil_container")
-    binexe = bindir.join("toil_container_v2.0.3")
+    # Use 'black' which is a code formatter tool with a CLI command
+    optexe = optdir.join("black", "23.12.1", "black")
+    binexe = bindir.join("black_23.12.1")
     result = runner.invoke(
         cli.register_python,
         [
             "--pypi_name",
-            "toil_container",
+            "black",
             "--pypi_version",
-            "v2.0.3",
+            "23.12.1",
             "--optdir",
             optdir.strpath,
             "--bindir",
             bindir.strpath,
             "--github_user",
-            "papaemmelab",
+            "psf",
             "--python",
-            "python2.7",
+            "python3",
         ],
     )
 
@@ -286,14 +293,19 @@ def test_register_python_github(tmpdir):
     import os
 
     workon_home = os.getenv("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
-    venv_path = os.path.join(workon_home, "production__toil_container__v2.0.3")
+    venv_path = os.path.join(workon_home, "production__black__23.12.1")
     assert os.path.exists(venv_path), f"Virtual environment not created at {venv_path}"
 
     # Check that wrapper script was created
     assert os.path.exists(optexe.strpath), "Wrapper script not created"
     assert os.path.exists(binexe.strpath), "Symlink not created"
 
-    # Try to run the executable - should fail if package is not available
+    # Verify the script content is correct
+    script_content = optexe.read()
+    assert "#!/bin/bash" in script_content
+    assert "black" in script_content
+
+    # Try to run the executable to verify it works
     for i in optexe.strpath, binexe.strpath:
         try:
             output = subprocess.check_output(
@@ -301,7 +313,7 @@ def test_register_python_github(tmpdir):
                 stderr=subprocess.STDOUT,
                 timeout=10,
             )
-            assert b"0.1.1" in output
+            assert b"black" in output.lower() or b"23.12" in output
         except (
             subprocess.CalledProcessError,
             subprocess.TimeoutExpired,

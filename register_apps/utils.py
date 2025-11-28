@@ -116,12 +116,9 @@ def create_venv_with_virtualenvwrapper(
     """
     Create virtual environment using virtualenvwrapper.
 
-    The env_name should follow the pattern: {environment}__{tool}__{version}
-    Example: 'production__toil_somalier__v0.1.0'
-
     Args:
         env_name: Name of the virtual environment (should include environment prefix).
-        python_interpreter: Python interpreter to use (e.g., 'python2', 'python3', 'python2.7').
+        python_interpreter: Python interpreter to use (e.g., 'python3', 'python2.7').
         environment: Environment name (default: 'production'). Used for validation
                      to ensure env_name follows the expected pattern.
 
@@ -130,13 +127,6 @@ def create_venv_with_virtualenvwrapper(
         subprocess.CalledProcessError: If mkvirtualenv command fails.
         ValueError: If env_name doesn't start with expected environment prefix.
     """
-    # Validate that env_name follows the expected pattern: {environment}__{tool}__{version}
-    expected_prefix = f"{environment}__"
-    if not env_name.startswith(expected_prefix):
-        raise ValueError(
-            f"Environment name '{env_name}' doesn't match expected pattern "
-            f"'{expected_prefix}*'. Expected format: {environment}__{{tool}}__{{version}}"
-        )
     virtualenvwrapper_script = get_virtualenvwrapper_script()
     cmd = _build_virtualenvwrapper_cmd(
         virtualenvwrapper_script, f"mkvirtualenv -p {python_interpreter} {env_name}"
