@@ -16,7 +16,6 @@ Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
 
 from pathlib import Path
-import os
 import shutil
 import subprocess
 import sys
@@ -27,6 +26,79 @@ import click
 from register_apps import config
 from register_apps import options
 from register_apps import utils
+
+
+def _normalize_image_url(
+    image_url, image_type, image_user, image_repository, image_version
+):
+    """
+    Normalize image URL based on container type.
+
+    Args:
+        image_url: Existing image URL or None.
+        image_type: Container type ('docker' or 'singularity').
+        image_user: Docker hub user/organization.
+        image_repository: Docker repository name.
+        image_version: Image version tag.
+
+    Returns:
+        str: Normalized image URL.
+    """
+    if not image_url:
+        image_url = f"{image_user}/{image_repository}:{image_version}"
+
+    if image_type == "singularity" and not image_url.startswith("docker://"):
+        image_url = f"docker://{image_url}"
+    elif image_type == "docker" and image_url.startswith("docker://"):
+        image_url = image_url.replace("docker://", "")
+
+    return image_url
+
+
+def _build_package_spec(pypi_name, pypi_version, github_user):
+    """
+    Build package specification string.
+
+    Args:
+        pypi_name: Package name.
+        pypi_version: Package version.
+        github_user: GitHub user (optional).
+
+    Returns:
+        str: Package specification.
+    """
+    if github_user:
+        return (
+            f"git+https://github.com/{github_user}/"
+            f"{pypi_name}@{pypi_version}#egg={pypi_name}"
+        )
+    return f"{pypi_name}=={pypi_version}"
+
+
+def _create_executable(optexe, binexe, command_parts):
+    """
+    Create executable script and symlink.
+
+    Args:
+        optexe: Path to the executable script.
+        binexe: Path to the symlink.
+        command_parts: List of command parts to join.
+
+    Raises:
+        OSError: If file operations fail.
+    """
+    click.echo("Creating and linking executable...")
+    try:
+        script_content = f"#!/bin/bash\n{' '.join(str(part) for part in command_parts)}"
+        optexe.write_text(script_content)
+        optexe.chmod(mode=0o755)
+        utils.force_symlink(optexe, binexe)
+        click.secho(
+            f"\nExecutables available at:\n" f"\n\t{str(optexe)}\n\t{str(binexe)}\n",
+            fg="green",
+        )
+    except OSError as e:
+        raise click.ClickException(f"Failed to create executable: {e}") from e
 
 
 @click.command()
@@ -69,80 +141,61 @@ def register_toil(  # pylint: disable=R0917
 ):
     """Register versioned toil container pipelines in a bin directory."""
     python = shutil.which(python)
+    if not python:
+        raise click.ClickException("Could not determine the python path.")
+
     optdir = Path(optdir) / pypi_name / pypi_version
     bindir = Path(bindir)
     optexe = optdir / pypi_name
     binexe = bindir / f"{pypi_name}_{pypi_version}"
     workdir = f"{tmpvar}/{pypi_name}_{pypi_version}_`uuidgen`"
-    image_url = image_url or f"{image_user}/{pypi_name}:{pypi_version}"
-    if container == "singularity" and not image_url.startswith("docker://"):
-        image_url = f"docker://{image_url}"
-    if container == "docker" and image_url.startswith("docker://"):
-        image_url = image_url.replace("docker://", "")
 
-    # check paths
-    assert python, "Could not determine the python path."
+    # Normalize image URL
+    image_url = _normalize_image_url(
+        image_url, container, image_user, pypi_name, pypi_version
+    )
 
-    # make sure dirs exist
+    # Setup directories
     optdir.mkdir(exist_ok=True, parents=True)
     bindir.mkdir(exist_ok=True, parents=True)
 
-    # create virtual environment using virtualenvwrapper
+    # Create and setup virtual environment
     env = f"{environment}__{pypi_name}__{pypi_version}"
     click.echo(f"Creating virtual environment '{env}'...")
     utils.create_venv_with_virtualenvwrapper(env, python, environment)
 
-    # Install package using virtualenvwrapper
-    if github_user:
-        package_spec = (
-            f"git+https://github.com/{github_user}/"
-            f"{pypi_name}@{pypi_version}#egg={pypi_name}"
-        )
-    else:
-        package_spec = f"{pypi_name}=={pypi_version}"
-
+    # Install package
+    package_spec = _build_package_spec(pypi_name, pypi_version, github_user)
     click.echo(f"Installing package '{package_spec}'...")
     pre_install_list = list(pre_install) if pre_install else None
     utils.install_package_with_virtualenvwrapper(
         env, package_spec, pre_install=pre_install_list
     )
 
-    # Find executable in virtualenvwrapper
+    # Find executable and build command
     toolpath = utils.find_executable_in_virtualenvwrapper(env, pypi_name)
-
-    # build command - use absolute path from virtualenvwrapper
-    command = [
-        toolpath,
-        '"$@"',
-    ]
+    command = [toolpath, '"$@"']
 
     if container == "singularity":
-        command += [
-            "--singularity",
-            _get_or_create_image(optdir, singularity, image_url),
-        ]
-    else:  # container == "docker"
-        command += [
-            "--docker",
-            image_url,
-        ]
+        command.extend(
+            [
+                "--singularity",
+                _get_or_create_image(optdir, singularity, image_url),
+            ]
+        )
+    else:  # docker
+        command.extend(["--docker", image_url])
 
-    command += [
-        " ".join(f"--volumes {i} {j}" for i, j in volumes),
-        "--workDir",
-        workdir,
-        "\n",
-    ]
-
-    # link executables
-    click.echo("Creating and linking executable...")
-    optexe.write_text(f"#!/bin/bash\n{' '.join(command)}")
-    optexe.chmod(mode=0o755)
-    utils.force_symlink(optexe, binexe)
-    click.secho(
-        f"\nExecutables available at:\n" f"\n\t{str(optexe)}" f"\n\t{str(binexe)}\n",
-        fg="green",
+    command.extend(
+        [
+            " ".join(f"--volumes {i} {j}" for i, j in volumes),
+            "--workDir",
+            workdir,
+            "\n",
+        ]
     )
+
+    _create_executable(optexe, binexe, command)
 
 
 def register_image(  # pylint: disable=R0913,R0917
@@ -192,37 +245,36 @@ def register_image(  # pylint: disable=R0913,R0917
     optexe = optdir / target
     binexe = bindir / target
     workdir = f"{tmpvar}/${{USER}}_{image_repository}_{image_version}_`uuidgen`"
-    image_url = image_url or f"{image_user}/{image_repository}:{image_version}"
-    if image_type == "singularity" and not image_url.startswith("docker://"):
-        image_url = f"docker://{image_url}"
-    if image_type == "docker" and image_url.startswith("docker://"):
-        image_url = image_url.replace("docker://", "")
 
-    # do not overwrite targets
-    if not force and (
-        os.path.isfile(optexe) or os.path.isfile(binexe)
-    ):  # pragma: no cover
+    # Normalize image URL
+    image_url = _normalize_image_url(
+        image_url, image_type, image_user, image_repository, image_version
+    )
+
+    # Check if targets exist
+    if not force and (optexe.exists() or binexe.exists()):
         raise click.UsageError(f"Targets exist, exiting...\n\t{optexe}\n\t{binexe}")
 
-    # make sure dirs exist
+    # Setup directories
     optdir.mkdir(exist_ok=True, parents=True)
     bindir.mkdir(exist_ok=True, parents=True)
 
-    # build command
+    # Build command based on container type
     if image_type == "singularity":
-        command = [
+        image_path = _get_or_create_image(optdir, runtime, image_url)
+        command_parts = [
             runtime,
             "exec",
             "--workdir",
             workdir,
             " ".join(f"--bind {i}:{j}" for i, j in volumes),
             "--no-home" if no_home else "",
-            _get_or_create_image(optdir, runtime, image_url),
+            image_path,
             command,
             '"$@"\n',
         ]
-    else:  # image_type == "docker"
-        command = [
+    else:  # docker
+        command_parts = [
             runtime,
             "run",
             "--rm",
@@ -237,16 +289,8 @@ def register_image(  # pylint: disable=R0913,R0917
             '"$@"\n',
         ]
 
-    # link executables
-    click.echo("Creating and linking executable...")
-    command = " ".join(list(filter(None, command)))
-    optexe.write_text(f"#!/bin/bash\n{command}")
-    optexe.chmod(mode=0o755)
-    utils.force_symlink(optexe, binexe)
-    click.secho(
-        f"\nExecutables available at:\n" f"\n\t{str(optexe)}" f"\n\t{str(binexe)}\n",
-        fg="green",
-    )
+    command_str = " ".join(filter(None, command_parts))
+    _create_executable(optexe, binexe, [command_str])
 
 
 @click.command()
@@ -319,74 +363,61 @@ def register_python(  # pylint: disable=R0917
 ):
     """Register versioned python pipelines in a bin directory."""
     python = shutil.which(python)
+    if not python:
+        raise click.ClickException("Could not determine the python path.")
+
     optdir = Path(optdir) / pypi_name / pypi_version
     bindir = Path(bindir)
     optexe = optdir / pypi_name
-    binexe = bindir / command or f"{pypi_name}_{pypi_version}"
+    binexe = bindir / (command or f"{pypi_name}_{pypi_version}")
 
-    # check paths
-    assert python, "Could not determine the python path."
-
-    # make sure dirs exist
+    # Setup directories
     optdir.mkdir(exist_ok=True, parents=True)
     bindir.mkdir(exist_ok=True, parents=True)
 
-    # create virtual environment using virtualenvwrapper
+    # Create and setup virtual environment
     env = f"{environment}__{pypi_name}__{pypi_version}"
     click.echo(f"Creating virtual environment '{env}'...")
     utils.create_venv_with_virtualenvwrapper(env, python, environment)
 
-    # Install package using virtualenvwrapper
-    if github_user:
-        package_spec = (
-            f"git+https://github.com/{github_user}/"
-            f"{pypi_name}@{pypi_version}#egg={pypi_name}"
-        )
-    else:
-        package_spec = f"{pypi_name}=={pypi_version}"
-
+    # Install package
+    package_spec = _build_package_spec(pypi_name, pypi_version, github_user)
     click.echo(f"Installing package '{package_spec}'...")
     pre_install_list = list(pre_install) if pre_install else None
     utils.install_package_with_virtualenvwrapper(
         env, package_spec, pre_install=pre_install_list
     )
 
-    # Find executable in virtualenvwrapper
+    # Find executable and create script
     command_name = command or pypi_name
     toolpath = utils.find_executable_in_virtualenvwrapper(env, command_name)
-
-    # build command - use absolute path from virtualenvwrapper
     cmd = [toolpath, '"$@"', "\n"]
 
-    # link executables
-    click.echo("Creating and linking executable...")
-    optexe.write_text(f"#!/bin/bash\n{' '.join(cmd)}")
-    optexe.chmod(mode=0o755)
-    utils.force_symlink(optexe, binexe)
-    click.secho(
-        f"\nExecutables available at:\n" f"\n\t{str(optexe)}" f"\n\t{str(binexe)}\n",
-        fg="green",
-    )
+    _create_executable(optexe, binexe, cmd)
 
 
 def _get_or_create_image(optdir, singularity, image_url):
     """Pull image if it's not locally available and store it."""
+    # Look for existing images
     singularity_images = list(optdir.glob("*.sif")) + list(optdir.glob("*.simg"))
-    if len(singularity_images) > 1:
-        click.echo(f"Found multiple images at {optdir}. Using {singularity_images[0]}.")
 
     if singularity_images:
+        if len(singularity_images) > 1:
+            click.echo(
+                f"Found multiple images at {optdir}. Using {singularity_images[0]}."
+            )
         click.echo(f"Image exists at: {singularity_images[0]}")
     else:
+        # Pull image if not found
         subprocess.check_call(
             ["/bin/bash", "-c", f"umask 22 && {singularity} pull {image_url}"],
             cwd=optdir,
         )
         singularity_images = list(optdir.glob("*.sif")) + list(optdir.glob("*.simg"))
-        assert singularity_images, f"Image not found: {optdir}"
+        if not singularity_images:
+            raise FileNotFoundError(f"Image not found after pull: {optdir}")
 
     singularity_image = singularity_images[0]
-    # fix singularity permissions
     singularity_image.chmod(mode=0o755)
     return str(singularity_image)
 
@@ -430,20 +461,19 @@ def install(
 
     click.echo(f"Found {len(apps)} apps to install")
 
+    def _get_app_name(app):
+        """Get display name for an app."""
+        return app.get("name") or app.get("target") or app.get("pypi_name", "unknown")
+
     if dry_run:
         click.echo("\n[DRY RUN] Would install the following apps:")
         for i, app in enumerate(apps, 1):
-            app_name = (
-                app.get("name") or app.get("target") or app.get("pypi_name", "unknown")
-            )
-            click.echo(f"  {i}. {app_name} ({app.get('type')})")
+            click.echo(f"  {i}. {_get_app_name(app)} ({app.get('type')})")
         return
 
     failed = []
     for i, app in enumerate(apps, 1):
-        app_name = (
-            app.get("name") or app.get("target") or app.get("pypi_name", "unknown")
-        )
+        app_name = _get_app_name(app)
         click.echo(f"\n[{i}/{len(apps)}] Installing {app_name}...")
 
         try:
@@ -451,8 +481,7 @@ def install(
             install_app(merged)
             click.secho(f"  ✓ {app_name} installed successfully", fg="green")
         except Exception as e:  # pylint: disable=broad-except
-            error_msg = f"  ✗ Failed to install {app_name}: {e}"
-            click.secho(error_msg, fg="red")
+            click.secho(f"  ✗ Failed to install {app_name}: {e}", fg="red")
             if not continue_on_error:
                 raise
             failed.append((app_name, str(e)))
@@ -488,13 +517,9 @@ def install_app(app_config: Dict[str, Any]) -> None:  # type: ignore
 
 def install_container_app(app_config: Dict[str, Any]) -> None:  # type: ignore
     """Install a container app."""
-    # Determine container runtime
     runtime_type = app_config.get("container_runtime", "singularity")
-    runtime_path = app_config.get(
-        f"{runtime_type}_path", runtime_type  # fallback to 'singularity' or 'docker'
-    )
+    runtime_path = app_config.get(f"{runtime_type}_path", runtime_type)
 
-    # Build arguments for register_image
     kwargs = {
         "bindir": app_config["bindir"],
         "optdir": app_config["optdir"],
@@ -512,10 +537,7 @@ def install_container_app(app_config: Dict[str, Any]) -> None:  # type: ignore
         "no_home": app_config.get("no_home", False),
     }
 
-    # Remove None values
-    kwargs = {k: v for k, v in kwargs.items() if v is not None}
-
-    register_image(**kwargs)
+    register_image(**{k: v for k, v in kwargs.items() if v is not None})
 
 
 def install_toil_app(app_config: Dict[str, Any]) -> None:  # type: ignore
@@ -538,10 +560,7 @@ def install_toil_app(app_config: Dict[str, Any]) -> None:  # type: ignore
         "pre_install": app_config.get("pre_install"),
     }
 
-    # Remove None values
-    kwargs = {k: v for k, v in kwargs.items() if v is not None}
-
-    register_toil(**kwargs)
+    register_toil(**{k: v for k, v in kwargs.items() if v is not None})
 
 
 def install_python_app(app_config: Dict[str, Any]) -> None:  # type: ignore
@@ -559,7 +578,4 @@ def install_python_app(app_config: Dict[str, Any]) -> None:  # type: ignore
         "pre_install": app_config.get("pre_install"),
     }
 
-    # Remove None values
-    kwargs = {k: v for k, v in kwargs.items() if v is not None}
-
-    register_python(**kwargs)
+    register_python(**{k: v for k, v in kwargs.items() if v is not None})

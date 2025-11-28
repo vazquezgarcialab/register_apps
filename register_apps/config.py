@@ -137,4 +137,3 @@ def get_apps_by_type(
     if app_type is None or app_type == "all":
         return apps
     return [app for app in apps if app.get("type") == app_type]
-

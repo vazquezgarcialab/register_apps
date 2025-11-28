@@ -5,25 +5,20 @@ import shutil
 import subprocess
 import sys
 import tarfile
-from pathlib import Path
 
 
 def force_link(src, dst):
     """Force a link between src and dst."""
-    try:
+    if os.path.exists(dst):
         os.unlink(dst)
-        os.link(src, dst)
-    except OSError:
-        os.link(src, dst)
+    os.link(src, dst)
 
 
 def force_symlink(src, dst):
     """Force a symlink between src and dst."""
-    try:
+    if os.path.exists(dst):
         os.unlink(dst)
-        os.symlink(src, dst)
-    except OSError:
-        os.symlink(src, dst)
+    os.symlink(src, dst)
 
 
 def tar_dir(output_path, source_dir):
@@ -76,6 +71,24 @@ def get_virtualenvwrapper_script():
     )
 
 
+def _get_virtualenvwrapper_env():
+    """Get environment variables for virtualenvwrapper commands."""
+    venv_env = os.environ.copy()
+    venv_env.setdefault("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
+    venv_env["VIRTUALENVWRAPPER_PYTHON"] = sys.executable
+    return venv_env
+
+
+def _build_virtualenvwrapper_cmd(script_path, command):
+    """Build a bash command to run with virtualenvwrapper sourced."""
+    venv_env = _get_virtualenvwrapper_env()
+    return (
+        f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
+        f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
+        f"source {script_path} && {command}"
+    )
+
+
 def is_virtualenvwrapper_configured():
     """
     Check if virtualenvwrapper is configured and available.
@@ -97,34 +110,41 @@ def is_virtualenvwrapper_configured():
         return False
 
 
-def create_venv_with_virtualenvwrapper(env_name, python_interpreter, environment="production"):
+def create_venv_with_virtualenvwrapper(
+    env_name, python_interpreter, environment="production"
+):
     """
     Create virtual environment using virtualenvwrapper.
 
+    The env_name should follow the pattern: {environment}__{tool}__{version}
+    Example: 'production__toil_somalier__v0.1.0'
+
     Args:
-        env_name: Name of the virtual environment.
+        env_name: Name of the virtual environment (should include environment prefix).
         python_interpreter: Python interpreter to use (e.g., 'python2', 'python3', 'python2.7').
-        environment: Environment name (default: 'production').
+        environment: Environment name (default: 'production'). Used for validation
+                     to ensure env_name follows the expected pattern.
 
     Raises:
         RuntimeError: If virtualenvwrapper is not available.
         subprocess.CalledProcessError: If mkvirtualenv command fails.
+        ValueError: If env_name doesn't start with expected environment prefix.
     """
+    # Validate that env_name follows the expected pattern: {environment}__{tool}__{version}
+    expected_prefix = f"{environment}__"
+    if not env_name.startswith(expected_prefix):
+        raise ValueError(
+            f"Environment name '{env_name}' doesn't match expected pattern "
+            f"'{expected_prefix}*'. Expected format: {environment}__{{tool}}__{{version}}"
+        )
     virtualenvwrapper_script = get_virtualenvwrapper_script()
-    venv_env = os.environ.copy()
-    venv_env.setdefault("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
-    venv_env["VIRTUALENVWRAPPER_PYTHON"] = sys.executable
-
-    cmd = (
-        f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
-        f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
-        f"source {virtualenvwrapper_script} && "
-        f"mkvirtualenv -p {python_interpreter} {env_name}"
+    cmd = _build_virtualenvwrapper_cmd(
+        virtualenvwrapper_script, f"mkvirtualenv -p {python_interpreter} {env_name}"
     )
 
     subprocess.check_output(
         ["/bin/bash", "-c", cmd],
-        env=venv_env,
+        env=_get_virtualenvwrapper_env(),
         stderr=subprocess.STDOUT,
     )
 
@@ -144,18 +164,13 @@ def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=N
         subprocess.CalledProcessError: If pip install command fails.
     """
     virtualenvwrapper_script = get_virtualenvwrapper_script()
-    venv_env = os.environ.copy()
-    venv_env.setdefault("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
-    venv_env["VIRTUALENVWRAPPER_PYTHON"] = sys.executable
+    venv_env = _get_virtualenvwrapper_env()
 
     # Install pre-install packages if specified
     if pre_install:
         for pre_pkg in pre_install:
-            cmd = (
-                f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
-                f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
-                f"source {virtualenvwrapper_script} && "
-                f"workon {env_name} && pip install {pre_pkg}"
+            cmd = _build_virtualenvwrapper_cmd(
+                virtualenvwrapper_script, f"workon {env_name} && pip install {pre_pkg}"
             )
             subprocess.check_output(
                 ["/bin/bash", "-c", cmd],
@@ -164,11 +179,8 @@ def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=N
             )
 
     # Install main package
-    cmd = (
-        f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
-        f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
-        f"source {virtualenvwrapper_script} && "
-        f"workon {env_name} && pip install {package_spec}"
+    cmd = _build_virtualenvwrapper_cmd(
+        virtualenvwrapper_script, f"workon {env_name} && pip install {package_spec}"
     )
     subprocess.check_output(
         ["/bin/bash", "-c", cmd],
@@ -193,26 +205,20 @@ def find_executable_in_virtualenvwrapper(env_name, command_name):
         FileNotFoundError: If executable is not found.
     """
     virtualenvwrapper_script = get_virtualenvwrapper_script()
-    venv_env = os.environ.copy()
-    venv_env.setdefault("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
-    venv_env["VIRTUALENVWRAPPER_PYTHON"] = sys.executable
-
-    cmd = (
-        f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
-        f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
-        f"source {virtualenvwrapper_script} && "
-        f"workon {env_name} && which {command_name}"
+    cmd = _build_virtualenvwrapper_cmd(
+        virtualenvwrapper_script, f"workon {env_name} && which {command_name}"
     )
 
     try:
         toolpath = subprocess.check_output(
             ["/bin/bash", "-c", cmd],
-            env=venv_env,
+            env=_get_virtualenvwrapper_env(),
             stderr=subprocess.STDOUT,
         )
         return toolpath.decode("utf-8").strip()
     except subprocess.CalledProcessError as e:
+        error_msg = e.stdout.decode("utf-8", errors="ignore") if e.stdout else str(e)
         raise FileNotFoundError(
             f"Executable '{command_name}' not found in virtualenv '{env_name}'. "
-            f"Error: {e.stdout.decode('utf-8', errors='ignore') if e.stdout else str(e)}"
+            f"Error: {error_msg}"
         ) from e
