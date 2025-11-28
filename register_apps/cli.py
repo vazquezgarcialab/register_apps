@@ -451,7 +451,6 @@ def install(
     continue_on_error,
 ):
     """Install apps from YAML configuration file."""
-    # Convert config_path to Path object, handling bytes (Python 3.6 compatibility)
     if isinstance(config_path, bytes):
         config_path = Path(config_path.decode("utf-8"))
     else:
