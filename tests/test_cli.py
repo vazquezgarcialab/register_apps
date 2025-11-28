@@ -1,7 +1,6 @@
 """register_apps cli tests."""
 
 import os
-import subprocess
 
 from click.testing import CliRunner
 import pytest
@@ -31,9 +30,8 @@ def _require_virtualenvwrapper():
         )
 
 
-@SKIP_DOCKER
-def test_register_docker(tmpdir):
-    """Test register_docker command."""
+def _test_register_container(tmpdir, container_cli):
+    """Helper function to test container registration."""
     runner = CliRunner()
     optdir = tmpdir.mkdir("opt")
     bindir = tmpdir.mkdir("bin")
@@ -41,7 +39,7 @@ def test_register_docker(tmpdir):
     binexe = bindir.join("test_cmd")
 
     result = runner.invoke(
-        cli.register_docker,
+        container_cli,
         [
             "--image_url",
             "alpine:latest",
@@ -69,46 +67,18 @@ def test_register_docker(tmpdir):
     assert result.exit_code == 0, f"Failed: {result.output}"
     assert os.path.exists(optexe.strpath)
     assert os.path.exists(binexe.strpath)
+
+
+@SKIP_DOCKER
+def test_register_docker(tmpdir):
+    """Test register_docker command."""
+    _test_register_container(tmpdir, cli.register_docker)
 
 
 @SKIP_SINGULARITY
 def test_register_singularity(tmpdir):
     """Test register_singularity command."""
-    runner = CliRunner()
-    optdir = tmpdir.mkdir("opt")
-    bindir = tmpdir.mkdir("bin")
-    optexe = optdir.join("alpine", "latest", "test_cmd")
-    binexe = bindir.join("test_cmd")
-
-    result = runner.invoke(
-        cli.register_singularity,
-        [
-            "--image_url",
-            "alpine:latest",
-            "--image_repository",
-            "alpine",
-            "--image_version",
-            "latest",
-            "--volumes",
-            "/tmp",
-            "/tmp",
-            "--optdir",
-            optdir.strpath,
-            "--bindir",
-            bindir.strpath,
-            "--tmpvar",
-            "$TMPDIR",
-            "--command",
-            "echo",
-            "--target",
-            "test_cmd",
-        ],
-        catch_exceptions=False,
-    )
-
-    assert result.exit_code == 0, f"Failed: {result.output}"
-    assert os.path.exists(optexe.strpath)
-    assert os.path.exists(binexe.strpath)
+    _test_register_container(tmpdir, cli.register_singularity)
 
 
 @SKIP_SINGULARITY
