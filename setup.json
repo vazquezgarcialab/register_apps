@@ -35,7 +35,7 @@
             "pytest>=7.0.0",
             "pytest-cov>=4.0.0",
             "pytest-env>=1.0.0",
-            "pylint>=2.0.0",
+            "pylint>=3.0.0",
             "setuptools<80",
             "tox>=4.0.0"
         ]
