@@ -180,7 +180,7 @@ def test_register_python(tmpdir):
     bindir = tmpdir.mkdir("bin")
     # Use 'black' which is a code formatter tool with a CLI command
     optexe = optdir.join("black", "23.12.1", "black")
-    binexe = bindir.join("black_23.12.1")
+    binexe = bindir.join("black")
     result = runner.invoke(
         cli.register_python,
         [
@@ -194,6 +194,8 @@ def test_register_python(tmpdir):
             bindir.strpath,
             "--python",
             "python3",
+            "--command",
+            "black",
         ],
     )
 
@@ -255,7 +257,7 @@ def test_register_python_github(tmpdir):
     bindir = tmpdir.mkdir("bin")
     # Use 'black' which is a code formatter tool with a CLI command
     optexe = optdir.join("black", "23.12.1", "black")
-    binexe = bindir.join("black_23.12.1")
+    binexe = bindir.join("black")
     result = runner.invoke(
         cli.register_python,
         [
@@ -271,6 +273,8 @@ def test_register_python_github(tmpdir):
             "psf",
             "--python",
             "python3",
+            "--command",
+            "black",
         ],
     )
 

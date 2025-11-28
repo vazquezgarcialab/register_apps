@@ -54,12 +54,12 @@ def get_virtualenvwrapper_script():
     if is_executable_available("virtualenvwrapper.sh"):
         result = subprocess.run(
             ["which", "virtualenvwrapper.sh"],
-            capture_output=True,
-            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             check=False,
         )
         if result.returncode == 0:
-            possible_paths.insert(0, result.stdout.strip())
+            possible_paths.insert(0, result.stdout.decode("utf-8").strip())
 
     for path in possible_paths:
         if path and os.path.exists(path):
@@ -205,7 +205,13 @@ def find_executable_in_virtualenvwrapper(env_name, command_name):
             env=_get_virtualenvwrapper_env(),
             stderr=subprocess.STDOUT,
         )
-        return toolpath.decode("utf-8").strip()
+        toolpath_str = toolpath.decode("utf-8").strip()
+        if not toolpath_str:
+            raise FileNotFoundError(
+                f"Executable '{command_name}' not found in virtualenv '{env_name}'. "
+                f"'which {command_name}' returned empty output."
+            )
+        return toolpath_str
     except subprocess.CalledProcessError as e:
         error_msg = e.stdout.decode("utf-8", errors="ignore") if e.stdout else str(e)
         raise FileNotFoundError(

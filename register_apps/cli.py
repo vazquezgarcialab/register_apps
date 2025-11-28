@@ -390,8 +390,30 @@ def register_python(  # pylint: disable=R0917
 
     # Find executable and create script
     command_name = command or pypi_name
-    toolpath = utils.find_executable_in_virtualenvwrapper(env, command_name)
-    cmd = [toolpath, '"$@"', "\n"]
+    try:
+        toolpath = utils.find_executable_in_virtualenvwrapper(env, command_name)
+        if not toolpath or not toolpath.strip():
+            raise FileNotFoundError(
+                f"Executable '{command_name}' not found in virtualenv '{env}'. "
+                f"'which {command_name}' returned empty output."
+            )
+    except FileNotFoundError:
+        # If command not found, try to use Python module execution as fallback
+        # Check if package can be imported
+        python_exe = utils.find_executable_in_virtualenvwrapper(env, "python")
+        if not python_exe:
+            raise click.ClickException(
+                f"Executable '{command_name}' not found in virtualenv '{env}' "
+                f"and Python executable not available. "
+                f"Please ensure the package provides a '{command_name}' command."
+            )
+        # Use python -m <package> as fallback
+        toolpath = f"{python_exe} -m {pypi_name}"
+        click.echo(
+            f"Command '{command_name}' not found, "
+            f"using 'python -m {pypi_name}' as fallback"
+        )
+    cmd = [toolpath, '"$@"']
 
     _create_executable(optexe, binexe, cmd)
 
@@ -426,7 +448,7 @@ def _get_or_create_image(optdir, singularity, image_url):
 @click.option(
     "--config",
     "config_path",
-    type=click.Path(exists=True, path_type=Path),
+    type=click.Path(exists=True),
     required=True,
     help="Path to YAML configuration file",
 )
@@ -453,6 +475,11 @@ def install(
     continue_on_error,
 ):
     """Install apps from YAML configuration file."""
+    # Convert config_path to Path object, handling bytes (Python 3.6 compatibility)
+    if isinstance(config_path, bytes):
+        config_path = Path(config_path.decode("utf-8"))
+    else:
+        config_path = Path(config_path)
     click.echo(f"Loading configuration from {config_path}...")
     cfg = config.load_config(config_path)
 
