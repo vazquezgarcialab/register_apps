@@ -49,17 +49,23 @@ Note: Some tests require Docker or Singularity to be installed and running. Thes
 
 ## Usage
 
-This package it's used to register versionized and containerized applications within a production environment. It provides 3 commands:
+This package is used to register versionized and containerized applications within a production environment. It provides 4 commands:
 
-* 🍡 `register_toil`
-* 📦 `register_singularity`
-* 🐍 `register_python`
+* 🍡 `register_toil` - Register Toil containerized pipelines
+* 📦 `register_singularity` - Register Singularity container commands
+* 🐍 `register_python` - Register Python packages
+* 📋 `register_apps` - Install multiple apps from YAML configuration
 
 ⚠️ **WARNING:** This package only works with singularity 2.4+
 
+⚠️ **NOTE:** This package requires [uv](https://github.com/astral-sh/uv) to be installed for managing virtual environments. Install it with:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
 ### Register a toil containerized application
 
-* 🍡 **`register_toil`** will install [toil container] pipelines in separate [virtual environments], pull a singularity image from the dockerhub and create executables that call the pipeline with the right parameters:
+* 🍡 **`register_toil`** will install [toil container] pipelines in separate virtual environments (using `uv`), pull a singularity image from the dockerhub and create executables that call the pipeline with the right parameters:
 
 ```bash
 register_toil \
@@ -76,10 +82,13 @@ Given this call, the following directory structure is created:
 ```bash
 /example/
 ├── bin
-│   └── toil_disambiguate_v0.1.2 -> /example/opt/toil_disambiguate/v0.1.2/toil_disambiguate
+│   └── toil_disambiguate_v0.1.2 -> /example/opt/toil_disambiguate/v0.1.2/toil_disambiguate
 └── opt
     └── toil_disambiguate
         └── v0.1.2
+            ├── .venv/              # Virtual environment (NEW)
+            │   └── bin/
+            │       └── toil_disambiguate
             ├── toil_disambiguate
             └── toil_disambiguate-v0.1.2.simg
 ```
@@ -90,7 +99,7 @@ And the executables look like this:
 cat /example/bin/toil_disambiguate
 
 #!/bin/bash
-/path/to/.virtualenvs/production__toil_disambiguate__v0.1.2/bin/toil_disambiguate $@ \
+$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.venv/bin/toil_disambiguate "$@" \
     --singularity /example/opt/toil_disambiguate/v0.1.2/toil_disambiguate-v0.1.2.simg \
     --volumes /ifs /ifs \
     --workDir $TMP_DIR
@@ -135,7 +144,7 @@ singularity exec \
     /example/opt/docker-svaba/v1.0.0/docker-svaba-v1.0.0.simg svaba "$@"
 ```
 
-* 🐍 **`register_python`** provides a method to register python packages without registering to run inside a container. It will create a similiar versionized directory structure and installing the python package and its dependencies within a virtual environemnt:
+* 🐍 **`register_python`** provides a method to register python packages without registering to run inside a container. It will create a similar versionized directory structure and install the python package and its dependencies within a virtual environment (using `uv`):
 
 ```bash
 register_python \
@@ -150,10 +159,13 @@ Given this call, the following directory structure is created:
 ```bash
 /example/
 ├── bin
-│   └── click_annotvcf_v1.0.7 -> /example/opt/click_annotvcfs/v1.0.7/click_annotvcf
+│   └── click_annotvcf_v1.0.7 -> /example/opt/click_annotvcf/v1.0.7/click_annotvcf
 └── opt
     └── click_annotvcf
         └── v1.0.7
+            ├── .venv/              # Virtual environment (NEW)
+            │   └── bin/
+            │       └── click_annotvcf
             └── click_annotvcf
 ```
 
@@ -163,8 +175,62 @@ And the executables look like this:
 cat /example/bin/click_annotvcf_v1.0.7
 
 #!/bin/bash
-/path/to/.virtualenvs/production__click_annotvcf__v1.0.7/bin/click_annotvcf "$@"
+$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.venv/bin/click_annotvcf "$@"
 ```
+
+### Batch Installation with YAML Configuration
+
+You can install multiple apps from a YAML configuration file instead of running individual commands:
+
+```bash
+register_apps install --config apps.yaml
+```
+
+**Example YAML configuration:**
+
+```yaml
+defaults:
+  bindir: /example/bin
+  optdir: /example/opt
+  container_runtime: singularity
+  singularity_path: /usr/bin/singularity
+  force: true
+
+apps:
+  # Container apps
+  - type: container
+    target: mosdepth
+    command: mosdepth
+    image_repository: mosdepth
+    image_version: 0.2.5
+    image_url: quay.io/biocontainers/mosdepth:0.2.5--hb763d49_0
+
+  # Toil apps
+  - type: toil
+    pypi_name: toil_battenberg
+    pypi_version: v1.0.7
+    image_url: docker://papaemmelab/toil_battenberg:v1.0.7
+    github_user: papaemmelab
+    python: python2
+    container: singularity
+    pre_install:  # Optional pre-install steps
+      - tensorflow==2.4.1 --no-cache-dir
+
+  # Python apps
+  - type: python
+    pypi_name: click_annotsv
+    pypi_version: v1.0.1
+    github_user: papaemmelab
+    python: python3
+```
+
+**Options:**
+- `--config` - Path to YAML configuration file (required)
+- `--filter` - Filter apps by type: `container`, `toil`, `python`, or `all` (default: `all`)
+- `--dry-run` - Preview what would be installed without actually installing
+- `--continue-on-error` - Continue installing other apps if one fails
+
+See `example_apps.yaml` for a complete example configuration file.
 
 ### Environment Variables
 
@@ -185,7 +251,6 @@ Contributions are welcome, and they are greatly appreciated, check our [contribu
 This package was created using [Cookiecutter] and the
 [papaemmelab/cookiecutter-toil] project template.
 
-[virtual environments]: http://virtualenvwrapper.readthedocs.io/en/latest/
 [toil container]: https://github.com/papaemmelab/toil_container
 [singularity]: http://singularity.lbl.gov/
 [cookiecutter]: https://github.com/audreyr/cookiecutter

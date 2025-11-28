@@ -20,9 +20,11 @@ import os
 import shutil
 import subprocess
 import sys
+from typing import Any, Dict
 
 import click
 
+from register_apps import config
 from register_apps import options
 from register_apps import utils
 
@@ -39,9 +41,16 @@ from register_apps import utils
 @options.TMPVAR
 @options.VOLUMES
 @options.SINGULARITY
-@options.VIRTUALENVWRAPPER
 @options.CONTAINER
 @options.ENVIRONMENT
+@click.option(
+    "--pre-install",
+    multiple=True,
+    help=(
+        "Package specifications to install before main package "
+        "(can be used multiple times)"
+    ),
+)
 def register_toil(  # pylint: disable=R0917
     pypi_name,
     pypi_version,
@@ -54,12 +63,11 @@ def register_toil(  # pylint: disable=R0917
     image_user,
     github_user,
     singularity,
-    virtualenvwrapper,
     container,
     environment,
+    pre_install,
 ):
     """Register versioned toil container pipelines in a bin directory."""
-    virtualenvwrapper = shutil.which(virtualenvwrapper)
     python = shutil.which(python)
     optdir = Path(optdir) / pypi_name / pypi_version
     bindir = Path(bindir)
@@ -74,52 +82,37 @@ def register_toil(  # pylint: disable=R0917
 
     # check paths
     assert python, "Could not determine the python path."
-    assert virtualenvwrapper, "Could not determine the virtualenvwrapper.sh path."
 
     # make sure dirs exist
     optdir.mkdir(exist_ok=True, parents=True)
     bindir.mkdir(exist_ok=True, parents=True)
 
-    # create virtual environment and install package
-    env = f"{environment}__{pypi_name}__{pypi_version}"
-    click.echo(f"Creating virtual environment '{env}'...")
-    # Set up environment variables for virtualenvwrapper
-    venv_env = os.environ.copy()
-    venv_env.setdefault("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
-    # VIRTUALENVWRAPPER_PYTHON should be the Python that has virtualenvwrapper installed
-    # (sys.executable), not the Python used to create the new venv
-    if not venv_env.get("VIRTUALENVWRAPPER_PYTHON"):
-        venv_env["VIRTUALENVWRAPPER_PYTHON"] = sys.executable
-    subprocess.check_output(
-        [
-            "/bin/bash",
-            "-c",
-            f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
-            f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
-            f"source {virtualenvwrapper} && mkvirtualenv -p {python} {env}",
-        ],
-        env=venv_env,
-    )
+    # create virtual environment using uv
+    venv_path = optdir / ".venv"
+    click.echo(f"Creating virtual environment at {venv_path}...")
+    utils.create_venv_with_uv(venv_path, python)
 
+    # Install package using uv
     if github_user:
-        install_cmd = (
-            f"source {virtualenvwrapper} && workon {env} && "
-            f"pip install git+https://github.com/{github_user}/"
-            f"{pypi_name}@{pypi_version}#egg={pypi_name} && which {pypi_name}"
+        package_spec = (
+            f"git+https://github.com/{github_user}/"
+            f"{pypi_name}@{pypi_version}#egg={pypi_name}"
         )
     else:
-        install_cmd = (
-            f"source {virtualenvwrapper} && workon {env} && "
-            f"pip install {pypi_name}=={pypi_version} && which {pypi_name}"
-        )
+        package_spec = f"{pypi_name}=={pypi_version}"
 
-    click.echo(f"Installing package with '{install_cmd}'...")
-    toolpath = subprocess.check_output(["/bin/bash", "-c", install_cmd], env=venv_env)
-    toolpath = toolpath.decode("utf-8").strip().rsplit("\n", maxsplit=1)[-1]
+    click.echo(f"Installing package '{package_spec}'...")
+    pre_install_list = list(pre_install) if pre_install else None
+    utils.install_package_with_uv(venv_path, package_spec, pre_install=pre_install_list)
 
-    # build command
+    # Verify executable exists in venv
+    utils.find_executable_in_venv(venv_path, pypi_name)
+
+    # build command - use relative path to venv
+    script_dir = '$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)'
+    relative_toolpath = f"{script_dir}/.venv/bin/{pypi_name}"
     command = [
-        toolpath,
+        relative_toolpath,
         '"$@"',
     ]
 
@@ -305,8 +298,15 @@ def register_docker(docker, *args, **kwargs):
 @options.OPTDIR
 @options.PYTHON3
 @options.VERSION
-@options.VIRTUALENVWRAPPER
 @options.ENVIRONMENT
+@click.option(
+    "--pre-install",
+    multiple=True,
+    help=(
+        "Package specifications to install before main package "
+        "(can be used multiple times)"
+    ),
+)
 def register_python(  # pylint: disable=R0917
     pypi_name,
     pypi_version,
@@ -315,11 +315,10 @@ def register_python(  # pylint: disable=R0917
     bindir,
     optdir,
     python,
-    virtualenvwrapper,
     environment,
+    pre_install,
 ):
     """Register versioned python pipelines in a bin directory."""
-    virtualenvwrapper = shutil.which(virtualenvwrapper)
     python = shutil.which(python)
     optdir = Path(optdir) / pypi_name / pypi_version
     bindir = Path(bindir)
@@ -328,51 +327,37 @@ def register_python(  # pylint: disable=R0917
 
     # check paths
     assert python, "Could not determine the python path."
-    assert virtualenvwrapper, "Could not determine the virtualenvwrapper.sh path."
 
     # make sure dirs exist
     optdir.mkdir(exist_ok=True, parents=True)
     bindir.mkdir(exist_ok=True, parents=True)
 
-    # create virtual environment and install package
-    env = f"{environment}__{pypi_name}__{pypi_version}"
-    click.echo(f"Creating virtual environment '{env}'...")
-    # Set up environment variables for virtualenvwrapper
-    venv_env = os.environ.copy()
-    venv_env.setdefault("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
-    # VIRTUALENVWRAPPER_PYTHON should be the Python that has virtualenvwrapper installed
-    # (sys.executable), not the Python used to create the new venv
-    if not venv_env.get("VIRTUALENVWRAPPER_PYTHON"):
-        venv_env["VIRTUALENVWRAPPER_PYTHON"] = sys.executable
-    subprocess.check_output(
-        [
-            "/bin/bash",
-            "-c",
-            f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
-            f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
-            f"source {virtualenvwrapper} && mkvirtualenv -p {python} {env}",
-        ],
-        env=venv_env,
-    )
+    # create virtual environment using uv
+    venv_path = optdir / ".venv"
+    click.echo(f"Creating virtual environment at {venv_path}...")
+    utils.create_venv_with_uv(venv_path, python)
 
+    # Install package using uv
     if github_user:
-        install_cmd = (
-            f"source {virtualenvwrapper} && workon {env} && "
-            f"pip install git+https://github.com/{github_user}/"
-            f"{pypi_name}@{pypi_version}#egg={pypi_name} && which {command or pypi_name}"
+        package_spec = (
+            f"git+https://github.com/{github_user}/"
+            f"{pypi_name}@{pypi_version}#egg={pypi_name}"
         )
     else:
-        install_cmd = (
-            f"source {virtualenvwrapper} && workon {env} && "
-            f"pip install {pypi_name}=={pypi_version} && which {command or pypi_name}"
-        )
+        package_spec = f"{pypi_name}=={pypi_version}"
 
-    click.echo(f"Installing package with '{install_cmd}'...")
-    toolpath = subprocess.check_output(["/bin/bash", "-c", install_cmd], env=venv_env)
-    toolpath = toolpath.decode("utf-8").strip().rsplit("\n", maxsplit=1)[-1]
+    click.echo(f"Installing package '{package_spec}'...")
+    pre_install_list = list(pre_install) if pre_install else None
+    utils.install_package_with_uv(venv_path, package_spec, pre_install=pre_install_list)
 
-    # build command
-    cmd = [toolpath, '"$@"', "\n"]
+    # Verify executable exists in venv
+    command_name = command or pypi_name
+    utils.find_executable_in_venv(venv_path, command_name)
+
+    # build command - use relative path to venv
+    script_dir = '$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)'
+    relative_toolpath = f"{script_dir}/.venv/bin/{command_name}"
+    cmd = [relative_toolpath, '"$@"', "\n"]
 
     # link executables
     click.echo("Creating and linking executable...")
@@ -405,3 +390,172 @@ def _get_or_create_image(optdir, singularity, image_url):
     # fix singularity permissions
     singularity_image.chmod(mode=0o755)
     return str(singularity_image)
+
+
+@click.command()
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Path to YAML configuration file",
+)
+@click.option(
+    "--filter",
+    type=click.Choice(["container", "toil", "python", "all"]),
+    default="all",
+    help="Filter apps by type",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be installed without actually installing",
+)
+@click.option(
+    "--continue-on-error",
+    is_flag=True,
+    help="Continue installing other apps if one fails",
+)
+def install(config_path, filter, dry_run, continue_on_error):
+    """Install apps from YAML configuration file."""
+    click.echo(f"Loading configuration from {config_path}...")
+    cfg = config.load_config(config_path)
+
+    defaults = cfg.get("defaults", {})
+    apps = config.get_apps_by_type(cfg, filter if filter != "all" else None)
+
+    click.echo(f"Found {len(apps)} apps to install")
+
+    if dry_run:
+        click.echo("\n[DRY RUN] Would install the following apps:")
+        for i, app in enumerate(apps, 1):
+            app_name = (
+                app.get("name") or app.get("target") or app.get("pypi_name", "unknown")
+            )
+            click.echo(f"  {i}. {app_name} ({app.get('type')})")
+        return
+
+    failed = []
+    for i, app in enumerate(apps, 1):
+        app_name = (
+            app.get("name") or app.get("target") or app.get("pypi_name", "unknown")
+        )
+        click.echo(f"\n[{i}/{len(apps)}] Installing {app_name}...")
+
+        try:
+            merged = config.merge_defaults(app, defaults)
+            install_app(merged)
+            click.secho(f"  ✓ {app_name} installed successfully", fg="green")
+        except Exception as e:  # pylint: disable=broad-except
+            error_msg = f"  ✗ Failed to install {app_name}: {e}"
+            click.secho(error_msg, fg="red")
+            if not continue_on_error:
+                raise
+            failed.append((app_name, str(e)))
+
+    if failed:
+        click.echo(f"\n{len(failed)} apps failed to install:")
+        for name, error in failed:
+            click.echo(f"  - {name}: {error}")
+        sys.exit(1)
+
+
+def install_app(app_config: Dict[str, Any]) -> None:  # type: ignore
+    """
+    Install a single app based on configuration.
+
+    Args:
+        app_config: App configuration dictionary with defaults merged.
+
+    Raises:
+        ValueError: If app type is unknown.
+    """
+    app_type = app_config["type"]
+
+    if app_type == "container":
+        install_container_app(app_config)
+    elif app_type == "toil":
+        install_toil_app(app_config)
+    elif app_type == "python":
+        install_python_app(app_config)
+    else:
+        raise ValueError(f"Unknown app type: {app_type}")
+
+
+def install_container_app(app_config: Dict[str, Any]) -> None:  # type: ignore
+    """Install a container app."""
+    # Determine container runtime
+    runtime_type = app_config.get("container_runtime", "singularity")
+    runtime_path = app_config.get(
+        f"{runtime_type}_path", runtime_type  # fallback to 'singularity' or 'docker'
+    )
+
+    # Build arguments for register_image
+    kwargs = {
+        "bindir": app_config["bindir"],
+        "optdir": app_config["optdir"],
+        "target": app_config.get("target"),
+        "command": app_config.get("command", ""),
+        "image_repository": app_config.get("image_repository"),
+        "image_version": app_config.get("image_version"),
+        "image_url": app_config.get("image_url"),
+        "image_user": app_config.get("image_user"),
+        "force": app_config.get("force", False),
+        "tmpvar": app_config.get("tmpvar", "$TMP_DIR"),
+        "volumes": app_config.get("volumes", []),
+        "runtime": runtime_path,
+        "image_type": runtime_type,
+        "no_home": app_config.get("no_home", False),
+    }
+
+    # Remove None values
+    kwargs = {k: v for k, v in kwargs.items() if v is not None}
+
+    register_image(**kwargs)
+
+
+def install_toil_app(app_config: Dict[str, Any]) -> None:  # type: ignore
+    """Install a toil app."""
+    kwargs = {
+        "bindir": app_config["bindir"],
+        "optdir": app_config["optdir"],
+        "pypi_name": app_config["pypi_name"],
+        "pypi_version": app_config["pypi_version"],
+        "image_url": app_config.get("image_url"),
+        "github_user": app_config.get("github_user"),
+        "python": app_config.get("python", "python3"),
+        "container": app_config.get("container", "singularity"),
+        "singularity": app_config.get("singularity_path", "singularity"),
+        "docker": app_config.get("docker_path", "docker"),
+        "tmpvar": app_config.get("tmpvar", "$TMP_DIR"),
+        "volumes": app_config.get("volumes", []),
+        "environment": app_config.get("environment", "production"),
+        "force": app_config.get("force", False),
+        "pre_install": app_config.get("pre_install"),
+    }
+
+    # Remove None values
+    kwargs = {k: v for k, v in kwargs.items() if v is not None}
+
+    register_toil(**kwargs)
+
+
+def install_python_app(app_config: Dict[str, Any]) -> None:  # type: ignore
+    """Install a python app."""
+    kwargs = {
+        "bindir": app_config["bindir"],
+        "optdir": app_config["optdir"],
+        "pypi_name": app_config["pypi_name"],
+        "pypi_version": app_config["pypi_version"],
+        "github_user": app_config.get("github_user"),
+        "command": app_config.get("command"),
+        "python": app_config.get("python", "python3"),
+        "environment": app_config.get("environment", "production"),
+        "force": app_config.get("force", False),
+        "pre_install": app_config.get("pre_install"),
+    }
+
+    # Remove None values
+    kwargs = {k: v for k, v in kwargs.items() if v is not None}
+
+    register_python(**kwargs)
