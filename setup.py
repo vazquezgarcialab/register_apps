@@ -33,7 +33,7 @@ setup(
             "register_python=register_apps.cli:register_python",
             "register_singularity=register_apps.cli:register_singularity",
             "register_toil=register_apps.cli:register_toil",
-            "register_apps=register_apps.cli:install",
+            "register_apps=register_apps.cli:cli",
         ]
     },
     setup_requires=[],

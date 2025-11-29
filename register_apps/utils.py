@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tarfile
 from pathlib import Path
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Union, Optional, Dict, Any
 
 import click
 
@@ -265,6 +265,7 @@ def normalize_image_url(
     image_user: str,
     image_repository: str,
     image_version: str,
+    image_registry: Optional[str] = None,
 ) -> str:
     """
     Normalize image URL based on container type.
@@ -275,12 +276,17 @@ def normalize_image_url(
         image_user: Docker hub user/organization.
         image_repository: Docker repository name.
         image_version: Image version tag.
+        image_registry: Optional container registry (e.g., 'quay.io', '123456789.dkr.ecr.us-east-1.amazonaws.com').
 
     Returns:
         str: Normalized image URL.
     """
     if not image_url:
-        image_url = f"{image_user}/{image_repository}:{image_version}"
+        # Construct image URL with optional registry
+        if image_registry:
+            image_url = f"{image_registry}/{image_user}/{image_repository}:{image_version}"
+        else:
+            image_url = f"{image_user}/{image_repository}:{image_version}"
 
     if image_type == "singularity" and not image_url.startswith("docker://"):
         image_url = f"docker://{image_url}"
@@ -334,3 +340,175 @@ def create_executable(optexe: Path, binexe: Path, command_parts: List[str]) -> N
         )
     except OSError as e:
         raise click.ClickException(f"Failed to create executable: {e}") from e
+
+
+def verify_executable(
+    executable_path: Path, verify_cmd: str = "--version", timeout: int = 60
+) -> Tuple[bool, str, Optional[str]]:
+    """
+    Verify an executable by running a verification command.
+
+    Args:
+        executable_path: Path to the executable to verify.
+        verify_cmd: Command to run for verification (default: "--version").
+        timeout: Timeout in seconds for the verification command.
+
+    Returns:
+        Tuple of (success: bool, output: str, error: Optional[str]).
+        If successful, error will be None. If failed, output may be empty and error contains the error message.
+    """
+    if not executable_path.exists():
+        return False, "", f"Executable not found: {executable_path}"
+
+    try:
+        result = subprocess.run(
+            [str(executable_path), verify_cmd],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=timeout,
+            universal_newlines=True,  # Compatible with Python 3.6+
+        )
+        output = result.stdout.strip() if result.stdout else ""
+        if result.returncode == 0:
+            return True, output, None
+        else:
+            return False, output, f"Command failed with exit code {result.returncode}"
+    except subprocess.TimeoutExpired:
+        return False, "", f"Command timed out after {timeout} seconds"
+    except Exception as e:
+        return False, "", f"Error running verification: {str(e)}"
+
+
+def extract_container_images(config: Dict[str, Any], filter_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Extract container image information from YAML config.
+
+    Args:
+        config: Configuration dictionary loaded from YAML.
+        filter_type: Filter by app type ('container', 'toil', or None for both).
+
+    Returns:
+        List of dictionaries with container image information.
+    """
+    from register_apps import config as config_module
+
+    defaults = config.get("defaults", {})
+    apps = config_module.get_apps_by_type(config, filter_type if filter_type else None)
+
+    containers = []
+    for app in apps:
+        app_type = app.get("type")
+        if app_type not in ["container", "toil"]:
+            continue
+
+        merged = config_module.merge_defaults(app, defaults)
+
+        # Get app name
+        app_name = merged.get("name") or merged.get("target") or merged.get("pypi_name", "unknown")
+
+        # Extract image information
+        image_url = merged.get("image_url")
+        image_registry = merged.get("image_registry", defaults.get("image_registry"))
+        image_user = merged.get("image_user", defaults.get("image_user", "papaemmelab"))
+        image_repository = merged.get("image_repository") or merged.get("pypi_name")
+        image_version = merged.get("image_version") or merged.get("pypi_version")
+        container_runtime = merged.get("container_runtime", defaults.get("container_runtime", "singularity"))
+
+        # Construct image URL if not provided
+        if not image_url and image_repository and image_version:
+            if image_registry:
+                image_url = f"{image_registry}/{image_user}/{image_repository}:{image_version}"
+            else:
+                image_url = f"{image_user}/{image_repository}:{image_version}"
+
+        # Normalize for singularity (add docker:// prefix if needed)
+        if container_runtime == "singularity" and image_url and not image_url.startswith("docker://"):
+            image_url = f"docker://{image_url}"
+
+        # Extract registry from image_url if not explicitly set
+        if image_url and not image_registry:
+            # Try to extract registry from image_url
+            url_parts = image_url.replace("docker://", "").split("/")
+            if len(url_parts) > 2 and "." in url_parts[0]:
+                image_registry = url_parts[0]
+            elif len(url_parts) > 2:
+                # Might be ECR or other registry
+                image_registry = url_parts[0]
+
+        containers.append({
+            "name": app_name,
+            "type": app_type,
+            "image_url": image_url,
+            "image_registry": image_registry,
+            "image_user": image_user,
+            "image_repository": image_repository,
+            "image_version": image_version,
+            "runtime": container_runtime,
+        })
+
+    return containers
+
+
+def format_container_list(containers: List[Dict[str, Any]], format_type: str = "table") -> str:
+    """
+    Format container list for output.
+
+    Args:
+        containers: List of container dictionaries from extract_container_images.
+        format_type: Output format ('table', 'json', 'yaml', 'pull-commands', 'migration').
+
+    Returns:
+        Formatted string output.
+    """
+    if format_type == "json":
+        import json
+        return json.dumps(containers, indent=2)
+
+    elif format_type == "yaml":
+        import yaml
+        return yaml.dump(containers, default_flow_style=False)
+
+    elif format_type == "pull-commands":
+        lines = []
+        for container in containers:
+            image_url = container.get("image_url", "")
+            # Remove docker:// prefix for pull commands
+            if image_url.startswith("docker://"):
+                image_url = image_url.replace("docker://", "")
+            if image_url:
+                lines.append(f"docker pull {image_url}")
+        return "\n".join(lines)
+
+    elif format_type == "migration":
+        import json
+        migration_data = []
+        for container in containers:
+            source = container.get("image_url", "")
+            if source.startswith("docker://"):
+                source = source.replace("docker://", "")
+            migration_data.append({
+                "name": container.get("name"),
+                "source": source,
+                "target": source,  # User can modify this
+            })
+        return json.dumps(migration_data, indent=2)
+
+    else:  # table format
+        lines = []
+        # Header
+        lines.append(f"{'Name':<20} {'Image URL':<50} {'Version':<15} {'Registry':<20} {'Runtime':<12}")
+        lines.append("-" * 120)
+
+        for container in containers:
+            name = container.get("name", "")[:18]
+            image_url = container.get("image_url", "")
+            if image_url.startswith("docker://"):
+                image_url = image_url.replace("docker://", "")
+            image_url = image_url[:48] if len(image_url) > 48 else image_url
+            version = container.get("image_version", "")[:13]
+            registry = (container.get("image_registry") or "")[:18]
+            runtime = container.get("runtime", "")[:10]
+
+            lines.append(f"{name:<20} {image_url:<50} {version:<15} {registry:<20} {runtime:<12}")
+
+        return "\n".join(lines)

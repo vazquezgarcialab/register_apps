@@ -2,17 +2,21 @@
 # This replaces the long bash script with a clean, maintainable YAML file
 
 # Global defaults - can be overridden per app
+
 defaults:
-  bindir: /usersoftware/papaemme/isabl/bin
-  optdir: /usersoftware/papaemme/isabl/local
-  container_runtime: singularity # or docker
-  singularity_path: /usr/bin/singularity
+  bindir: /isabl/bin
+  optdir: /isabl/local
+  container_runtime: docker
   docker_path: docker
+  image_user: papaemmelab
   volumes:
-    - /data1:/data1
+    - /isabl:/isabl
+    - /work:/work
   tmpvar: $TMP_DIR
-  environment: production
+  environment: development
   force: true
+  verify: "--version"
+  verify_after_install: false
 
 # List of apps to install
 apps:
@@ -37,26 +41,29 @@ apps:
   - type: container
     target: STAR-Fusion
     command: STAR-Fusion
+    image_user: papaemmelab
     image_repository: docker-starfusion
     image_version: v1.3.1
 
   - type: container
     target: fuseq
     command: FuSeq
+    image_user: papaemmelab
     image_repository: docker-fuseq
     image_version: v1.1.1
 
   - type: container
     target: click_mergefusions_v1.0.7
     command: click_mergefusions
+    image_user: papaemmelab
     image_repository: click_mergefusions
     image_version: v1.0.7
 
   - type: container
     target: HemeAutotator
     command: Rscript
-    image_url: docker://papaemmelab/docker-heme-autotator:v0.2.0
-    image_repository: papaemmelab
+    image_user: papaemmelab
+    image_repository: docker-heme-autotator
     image_version: v0.2.0
 
   - type: container
@@ -71,11 +78,11 @@ apps:
     command: svaba
     image_repository: docker-svaba
     image_version: v1.0.0
-    image_url: docker://papaemmelab/docker-svaba:v1.0.0
 
   - type: container
     target: gridss
     command: sh /run.sh
+    image_user: papaemmelab
     image_repository: docker-gridss
     image_version: 2.2.2
 
@@ -89,16 +96,16 @@ apps:
   - type: container
     target: picard
     command: /usr/picard/docker_helper.sh
+    image_user: papaemmelab
     image_repository: docker-picard
     image_version: v1.1.0
-    image_url: docker://papaemmelab/docker-picard:v1.1.0
 
   - type: container
     target: fastqc
     command: fastqc
+    image_user: papaemmelab
     image_repository: docker-fastqc
     image_version: v1.0.1
-    image_url: docker://papaemmelab/docker-fastqc:v1.0.1
 
   - type: container
     target: rna-seqc
@@ -163,12 +170,14 @@ apps:
   - type: container
     target: facets
     command: Rscript /facets/run.R
+    image_user: papaemmelab
     image_repository: docker-facets
     image_version: v0.1.1
 
   - type: container
     target: facets_ch
     command: Rscript /facets-ch/facets-ch.R
+    image_user: papaemmelab
     image_repository: facets-ch
     image_version: v0.1.0
 
@@ -202,6 +211,7 @@ apps:
   - type: container
     target: click_driverclone
     command: click_driverclone
+    image_user: papaemmelab
     image_repository: driverclone
     image_version: v0.1.0
 
@@ -307,9 +317,9 @@ apps:
   - type: container
     target: rnacaller
     command: perl /opt/rnacaller/bin/Flt3Itd.pl
+    image_user: papaemmelab
     image_repository: rnacaller
     image_version: v0.1.0
-    image_url: docker://papaemmelab/rnacaller:v0.1.0
 
   # ============================================
   # TOIL APPS

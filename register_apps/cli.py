@@ -28,6 +28,12 @@ from register_apps import options
 from register_apps import utils
 
 
+@click.group()
+def cli():
+    """Register versioned container pipelines and commands."""
+    pass
+
+
 @click.command()
 @options.PYPI_NAME
 @options.PYPI_VERSION
@@ -65,6 +71,7 @@ def register_toil(  # pylint: disable=R0917
     container,
     environment,
     pre_install,
+    image_registry=None,
 ):
     """Register versioned toil container pipelines in a bin directory."""
     # Normalize volumes to ensure they're in tuple format
@@ -82,7 +89,7 @@ def register_toil(  # pylint: disable=R0917
 
     # Normalize image URL
     image_url = utils.normalize_image_url(
-        image_url, container, image_user, pypi_name, pypi_version
+        image_url, container, image_user, pypi_name, pypi_version, image_registry
     )
 
     # Setup directories
@@ -143,6 +150,7 @@ def register_image(  # pylint: disable=R0913,R0917
     target,
     tmpvar,
     volumes,
+    image_registry=None,
 ):
     """
     Register a container image (Docker or Singularity) as an executable.
@@ -166,6 +174,7 @@ def register_image(  # pylint: disable=R0913,R0917
         target: Name of the target executable to create.
         tmpvar: Environment variable for work directory.
         volumes: List of (source, destination) volume mappings.
+        image_registry: Optional container registry (e.g., 'quay.io', ECR URL).
 
     Raises:
         click.UsageError: If targets already exist and force is False.
@@ -173,6 +182,7 @@ def register_image(  # pylint: disable=R0913,R0917
     # Normalize volumes to ensure they're in tuple format
     volumes = utils.normalize_volumes(volumes)
 
+    image_version = str(image_version)
     optdir = Path(optdir) / image_repository / image_version
     bindir = Path(bindir)
     optexe = optdir / target
@@ -181,7 +191,7 @@ def register_image(  # pylint: disable=R0913,R0917
 
     # Normalize image URL
     image_url = utils.normalize_image_url(
-        image_url, image_type, image_user, image_repository, image_version
+        image_url, image_type, image_user, image_repository, image_version, image_registry
     )
 
     # Check if targets exist
@@ -377,24 +387,37 @@ def _get_or_create_image(optdir, singularity, image_url):
     is_flag=True,
     help="Continue installing other apps if one fails",
 )
+@click.option(
+    "--verify-after-install",
+    "--verify",
+    is_flag=True,
+    help="Verify each app after installation by running its verify command",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Overwrite existing targets (overrides defaults.force)",
+)
 def install(
     config_path,
     filter,
     dry_run,
     continue_on_error,
+    verify_after_install,
+    force,
 ):
     """Install apps from YAML configuration file."""
     if isinstance(config_path, bytes):
         config_path = Path(config_path.decode("utf-8"))
     else:
         config_path = Path(config_path)
-    click.echo(f"Loading configuration from {config_path}...")
+    click.secho(f"Loading configuration from {config_path}...", fg="yellow")
     cfg = config.load_config(config_path)
 
     defaults = cfg.get("defaults", {})
     apps = config.get_apps_by_type(cfg, filter if filter != "all" else None)
 
-    click.echo(f"Found {len(apps)} apps to install")
+    click.secho(f"Found {len(apps)} apps to install", fg="cyan")
 
     def _get_app_name(app):
         """Get display name for an app."""
@@ -409,14 +432,41 @@ def install(
     failed = []
     for i, app in enumerate(apps, 1):
         app_name = _get_app_name(app)
-        click.echo(f"\n[{i}/{len(apps)}] Installing {app_name}...")
+        click.secho(f"\n[{i}/{len(apps)}] Installing {app_name}...", fg="yellow")
 
         try:
             merged = config.merge_defaults(app, defaults)
+            # Override force if CLI flag is set
+            if force:
+                merged["force"] = True
+            # Override verify_after_install if CLI flag is set
+            if verify_after_install:
+                merged["verify_after_install"] = True
+
             install_app(merged)
-            click.secho(f"  ✓ {app_name} installed successfully", fg="green")
+            click.secho(f"✓ {app_name} installed successfully", fg="cyan")
+
+            # Verify after install if requested
+            should_verify = merged.get("verify_after_install", defaults.get("verify_after_install", False))
+            if should_verify:
+                bindir = Path(merged.get("bindir", defaults.get("bindir")))
+                target = merged.get("target") or merged.get("pypi_name")
+                if target:
+                    executable_path = bindir / target
+                    verify_cmd = merged.get("verify", defaults.get("verify", "--version"))
+                    click.echo(f"Verifying {app_name}...")
+                    success, output, error = utils.verify_executable(executable_path, verify_cmd)
+                    if success:
+                        if output:
+                            click.secho(f"✓ Verification passed: {output[:100]}", fg="cyan")
+                        else:
+                            click.secho(f"✓ Verification passed", fg="cyan")
+                    else:
+                        click.secho(f"✗ Verification failed: {error or 'Unknown error'}", fg="red")
+                        if not continue_on_error:
+                            raise click.ClickException(f"Verification failed for {app_name}")
         except Exception as e:  # pylint: disable=broad-except
-            click.secho(f"  ✗ Failed to install {app_name}: {e}", fg="red")
+            click.secho(f"✗ Failed to install {app_name}: {e}", fg="red")
             if not continue_on_error:
                 raise
             failed.append((app_name, str(e)))
@@ -426,6 +476,180 @@ def install(
         for name, error in failed:
             click.echo(f"  - {name}: {error}")
         sys.exit(1)
+
+
+@click.command()
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=True),
+    required=True,
+    help="Path to YAML configuration file",
+)
+@click.option(
+    "--bindir",
+    type=click.Path(exists=True, dir_okay=True),
+    help="Override bindir from config (optional)",
+)
+@click.option(
+    "--filter",
+    type=click.Choice(["container", "toil", "python", "all"]),
+    default="all",
+    help="Filter apps by type",
+)
+@click.option(
+    "--timeout",
+    type=int,
+    default=10,
+    help="Timeout per tool in seconds",
+)
+@click.option(
+    "--continue-on-error",
+    is_flag=True,
+    help="Continue verifying other apps if one fails",
+)
+@click.option(
+    "--format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    help="Output format",
+)
+def verify(
+    config_path,
+    bindir,
+    filter,
+    timeout,
+    continue_on_error,
+    format,
+):
+    """Verify installed apps by running their verify commands."""
+    if isinstance(config_path, bytes):
+        config_path = Path(config_path.decode("utf-8"))
+    else:
+        config_path = Path(config_path)
+
+    click.secho(f"Loading configuration from {config_path}...", fg="yellow")
+    cfg = config.load_config(config_path)
+
+    defaults = cfg.get("defaults", {})
+    apps = config.get_apps_by_type(cfg, filter if filter != "all" else None)
+
+    # Use provided bindir or get from defaults
+    bindir_path = Path(bindir) if bindir else Path(defaults.get("bindir"))
+    if not bindir_path.exists():
+        raise click.ClickException(f"Bindir does not exist: {bindir_path}")
+
+    click.echo(f"Verifying {len(apps)} apps from {bindir_path}...")
+
+    def _get_app_name(app):
+        """Get display name for an app."""
+        return app.get("name") or app.get("target") or app.get("pypi_name", "unknown")
+
+    results = []
+    for app in apps:
+        app_name = _get_app_name(app)
+        merged = config.merge_defaults(app, defaults)
+        target = merged.get("target") or merged.get("pypi_name")
+
+        if not target:
+            click.secho(f"  ⚠ Skipping {app_name}: no target/pypi_name", fg="yellow")
+            continue
+
+        executable_path = bindir_path / target
+        verify_cmd = merged.get("verify", defaults.get("verify", "--version"))
+        
+        success, output, error = utils.verify_executable(executable_path, verify_cmd, timeout)
+        results.append({
+            "name": app_name,
+            "target": target,
+            "type": merged.get("type"),
+            "success": success,
+            "output": output,
+            "error": error,
+        })
+
+        if success:
+            if output:
+                click.secho(f"  ✓ {app_name} ({verify_cmd}): {output[:80]}", fg="green")
+            else:
+                click.secho(f"  ✓ {app_name} ({verify_cmd}): passed", fg="green")
+        else:
+            click.secho(f"  ✗ {app_name} ({verify_cmd}): {error or 'Unknown error'}", fg="red")
+            if not continue_on_error:
+                raise click.ClickException(f"Verification failed for {app_name}")
+
+    # Summary
+    passed = sum(1 for r in results if r["success"])
+    failed = len(results) - passed
+
+    if format == "json":
+        import json
+        click.echo(json.dumps(results, indent=2))
+    else:
+        click.echo(f"\nSummary: {passed} passed, {failed} failed out of {len(results)} apps")
+
+    if failed > 0:
+        sys.exit(1)
+
+
+@click.command()
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=True),
+    required=True,
+    help="Path to YAML configuration file",
+)
+@click.option(
+    "--filter",
+    type=click.Choice(["container", "toil", "all"]),
+    default="container",
+    help="Filter apps by type (default: container)",
+)
+@click.option(
+    "--format",
+    type=click.Choice(["table", "json", "yaml", "pull-commands", "migration"]),
+    default="table",
+    help="Output format",
+)
+@click.option(
+    "--output",
+    type=click.Path(),
+    help="Write output to file (optional)",
+)
+def list_containers(
+    config_path,
+    filter,
+    format,
+    output,
+):
+    """List all container images from YAML configuration."""
+    if isinstance(config_path, bytes):
+        config_path = Path(config_path.decode("utf-8"))
+    else:
+        config_path = Path(config_path)
+
+    click.secho(f"Loading configuration from {config_path}...", fg="yellow", err=True)
+    cfg = config.load_config(config_path)
+
+    # Extract container images
+    filter_type = filter if filter != "all" else None
+    containers = utils.extract_container_images(cfg, filter_type)
+
+    if not containers:
+        click.echo("No containers found.")
+        return
+
+    # Format output
+    output_text = utils.format_container_list(containers, format)
+
+    # Write to file or stdout
+    if output:
+        output_path = Path(output)
+        output_path.write_text(output_text)
+        click.echo(f"Output written to {output_path}")
+    else:
+        click.echo(output_text)
 
 
 def install_app(app_config: Dict[str, Any]) -> None:  # type: ignore
@@ -470,6 +694,7 @@ def install_container_app(app_config: Dict[str, Any]) -> None:  # type: ignore
         runtime=runtime_path,
         image_type=runtime_type,
         no_home=app_config.get("no_home", False),
+        image_registry=app_config.get("image_registry"),
     )
 
 
@@ -491,6 +716,7 @@ def install_toil_app(app_config: Dict[str, Any]) -> None:  # type: ignore
         environment=app_config.get("environment", "development"),
         force=app_config.get("force", False),
         pre_install=app_config.get("pre_install"),
+        image_registry=app_config.get("image_registry"),
     )
 
 
@@ -508,3 +734,9 @@ def install_python_app(app_config: Dict[str, Any]) -> None:  # type: ignore
         force=app_config.get("force", False),
         pre_install=app_config.get("pre_install"),
     )
+
+
+# Register commands to the CLI group (must be after function definitions)
+cli.add_command(install, name="install")
+cli.add_command(verify, name="verify")
+cli.add_command(list_containers, name="list-containers")

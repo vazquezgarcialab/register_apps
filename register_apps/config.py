@@ -117,6 +117,8 @@ def merge_defaults(app: Dict[str, Any], defaults: Dict[str, Any]) -> Dict[str, A
     """
     merged = defaults.copy()
     merged.update(app)
+    # Ensure verify_after_install and force are properly merged (CLI flags can override)
+    # These will be handled at the CLI level, but we ensure defaults are set
     return merged
 
 

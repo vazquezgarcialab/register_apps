@@ -42,7 +42,7 @@ IMAGE_REPOSITORY = click.option(
     "--image_repository", required=True, help="docker hub repository name"
 )
 IMAGE_VERSION = click.option(
-    "--image_version", required=True, help="docker hub image version"
+    "--image_version", required=True, help="docker hub image version", type=str
 )
 IMAGE_USER = click.option(
     "--image_user",
