@@ -330,11 +330,10 @@ apps:
     image_url: docker://papaemmelab/toil_battenberg:v1.0.7
     github_user: papaemmelab
     python: python2
-    container: singularity
-    # Note: pre_install steps would go here if needed
-    # pre_install:
-    #   - pip uninstall -y toil_container
-    #   - pip install git+https://github.com/papaemmelab/toil_container@v1.1.7#eggs=toil_container
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
 
   - type: toil
     pypi_name: toil_brass
@@ -342,7 +341,10 @@ apps:
     image_url: docker://papaemmelab/toil_brass:v1.0.2
     github_user: papaemmelab
     python: python2
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
 
   - type: toil
     pypi_name: toil_brass
@@ -350,7 +352,10 @@ apps:
     image_url: docker://papaemmelab/toil_brass:v1.2.0
     github_user: papaemmelab
     python: python2
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
 
   - type: toil
     pypi_name: toil_unmatched_cnvkit
@@ -358,15 +363,10 @@ apps:
     image_url: docker://papaemmelab/toil_unmatched_cnvkit:v1.0.0
     github_user: papaemmelab
     python: python3
-    container: singularity
-
-  - type: toil
-    pypi_name: toil_cnacs
-    pypi_version: v0.2.0
-    image_url: docker://papaemmelab/docker-cnacs:v0.1.0
-    github_user: papaemmelab
-    python: python2
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
 
   - type: toil
     pypi_name: toil_pindel
@@ -374,7 +374,10 @@ apps:
     image_url: docker://papaemmelab/toil_pindel:v1.2.0
     github_user: papaemmelab
     python: python3
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
 
   - type: toil
     pypi_name: toil_disambiguate
@@ -382,7 +385,10 @@ apps:
     image_url: docker://papaemmelab/toil_disambiguate:v1.1.1
     github_user: papaemmelab
     python: python2
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
 
   - type: toil
     pypi_name: toil_mutect
@@ -390,7 +396,10 @@ apps:
     image_url: docker://papaemmelab/toil_mutect:v1.2.10
     github_user: papaemmelab
     python: python3
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
 
   - type: toil
     pypi_name: toil_mutect
@@ -398,7 +407,10 @@ apps:
     image_url: docker://papaemmelab/toil_mutect:v1.2.7
     github_user: papaemmelab
     python: python2
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
 
   - type: toil
     pypi_name: toil_strelka
@@ -406,7 +418,10 @@ apps:
     image_url: docker://papaemmelab/toil_strelka:v1.0.9
     github_user: papaemmelab
     python: python3
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
 
   - type: toil
     pypi_name: toil_conpair
@@ -414,30 +429,32 @@ apps:
     image_url: docker://papaemmelab/toil_conpair:v1.0.4
     github_user: papaemmelab
     python: python2
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
 
   - type: toil
     pypi_name: toil_freebayes
     pypi_version: v0.2.0
     image_url: docker://papaemmelab/toil_freebayes:v0.2.0
+    python: python3
     github_user: papaemmelab
-    container: singularity
-
-  - type: toil
-    pypi_name: toil_rnafusions
-    pypi_version: v1.0.0
-    image_url: docker://papaemmelab/toil_rnafusions:v1.0.0
-    github_user: papaemmelab
-    python: python2
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
 
   - type: toil
     pypi_name: toil_mergevcfs
     pypi_version: v0.12.0
     image_url: docker://papaemmelab/toil_mergevcfs:v0.12.0
     github_user: papaemmelab
-    python: python2
-    container: singularity
+    python: python3
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
 
   - type: toil
     pypi_name: toil_mergevcfs
@@ -445,7 +462,10 @@ apps:
     image_url: docker://papaemmelab/toil_mergevcfs:v0.13.2
     github_user: papaemmelab
     python: python3
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
 
   - type: toil
     pypi_name: toil_cvflag
@@ -453,7 +473,10 @@ apps:
     image_url: docker://papaemmelab/toil_cvflag:v0.3.0
     github_user: papaemmelab
     python: python3
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
 
   - type: toil
     pypi_name: toil_somalier
@@ -461,7 +484,10 @@ apps:
     image_url: docker://papaemmelab/toil_somalier:v0.1.0
     github_user: papaemmelab
     python: python3
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
 
   - type: toil
     pypi_name: toil_ace
@@ -469,7 +495,10 @@ apps:
     image_url: docker://papaemmelab/toil_ace:v1.0.2
     github_user: papaemmelab
     python: python3
-    container: singularity
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
 
   # Special cases with pre-install steps
   - type: toil
@@ -478,30 +507,22 @@ apps:
     image_url: docker://papaemmelab/toil_caveman:v1.0.6
     github_user: papaemmelab
     python: python2
-    container: singularity
+    container: docker
     pre_install:
-      - git+https://github.com/papaemmelab/toil_cvflag@c224aa1#eggs=toil_cvflag
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
+      - git+https://github.com/papaemmelab/toil_cvflag@v0.4.0#eggs=toil_cvflag
 
-  - type: toil
-    pypi_name: toil_formalinfixer
-    pypi_version: v0.0.2
-    image_url: docker://papaemmelab/toil_formalinfixer:v0.0.2
-    github_user: papaemmelab
-    python: python3
-    container: singularity
-    pre_install:
-      - tensorflow==2.4.1 --no-cache-dir
-
-  - type: toil
-    pypi_name: toil_cnvkit
-    pypi_version: v1.0.0
-    image_url: docker://papaemmelab/toil_cnvkit:v1.0.0
-    github_user: papaemmelab
-    python: python2
-    container: singularity
-    pre_install:
-      - numpy==1.9
-      - biopython==1.62
+  # - type: toil
+  #   pypi_name: toil_cnvkit
+  #   pypi_version: v1.0.0
+  #   image_url: docker://papaemmelab/toil_cnvkit:v1.0.0
+  #   github_user: papaemmelab
+  #   python: python2
+  #   container: docker
+  #   pre_install:
+  #     - numpy==1.9
+  #     - biopython==1.62
 
   # ============================================
   # PYTHON APPS

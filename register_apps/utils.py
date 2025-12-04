@@ -93,6 +93,43 @@ def _build_virtualenvwrapper_cmd(script_path, command):
     )
 
 
+def _run_command_with_live_output(cmd, env=None, verbose=True):
+    """
+    Run a command and show live output.
+    
+    Args:
+        cmd: Command to run (list of strings).
+        env: Environment variables dict (optional).
+        verbose: If True, print output in real-time (default: True).
+    
+    Raises:
+        subprocess.CalledProcessError: If command fails.
+    """
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        env=env,
+        universal_newlines=True,
+        bufsize=1,  # Line buffered
+    )
+    
+    output_lines = []
+    for line in iter(process.stdout.readline, ''):
+        if line:
+            line = line.rstrip()
+            output_lines.append(line)
+            if verbose:
+                click.echo(line)
+    
+    process.stdout.close()
+    returncode = process.wait()
+    
+    if returncode != 0:
+        output = '\n'.join(output_lines)
+        raise subprocess.CalledProcessError(returncode, cmd, output=output)
+
+
 def is_virtualenvwrapper_configured():
     """
     Check if virtualenvwrapper is configured and available.
@@ -115,7 +152,7 @@ def is_virtualenvwrapper_configured():
 
 
 def create_venv_with_virtualenvwrapper(
-    env_name, python_interpreter, environment="production"
+    env_name, python_interpreter, environment="production", verbose=True
 ):
     """
     Create virtual environment using virtualenvwrapper.
@@ -124,6 +161,7 @@ def create_venv_with_virtualenvwrapper(
         env_name: Name of the virtual environment.
         python_interpreter: Python interpreter to use (e.g., 'python3', 'python2.7').
         environment: Environment name (default: 'production').
+        verbose: If True, show live output (default: True).
 
     Raises:
         RuntimeError: If virtualenvwrapper is not available.
@@ -134,14 +172,14 @@ def create_venv_with_virtualenvwrapper(
         virtualenvwrapper_script, f"mkvirtualenv -p {python_interpreter} {env_name}"
     )
 
-    subprocess.check_output(
+    _run_command_with_live_output(
         ["/bin/bash", "-c", cmd],
         env=_get_virtualenvwrapper_env(),
-        stderr=subprocess.STDOUT,
+        verbose=verbose,
     )
 
 
-def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=None):
+def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=None, verbose=True):
     """
     Install package in virtualenvwrapper environment.
 
@@ -150,6 +188,7 @@ def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=N
         package_spec: Package specification (e.g., 'package==1.0.0' or
                      'git+https://github.com/user/repo@tag#egg=package').
         pre_install: Optional list of package specs to install before main package.
+        verbose: If True, show live output (default: True).
 
     Raises:
         RuntimeError: If virtualenvwrapper is not available.
@@ -162,22 +201,22 @@ def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=N
     if pre_install:
         for pre_pkg in pre_install:
             cmd = _build_virtualenvwrapper_cmd(
-                virtualenvwrapper_script, f"workon {env_name} && pip install {pre_pkg}"
+                virtualenvwrapper_script, f"workon {env_name} && pip3 install {pre_pkg}"
             )
-            subprocess.check_output(
+            _run_command_with_live_output(
                 ["/bin/bash", "-c", cmd],
                 env=venv_env,
-                stderr=subprocess.STDOUT,
+                verbose=verbose,
             )
 
     # Install main package
     cmd = _build_virtualenvwrapper_cmd(
         virtualenvwrapper_script, f"workon {env_name} && pip install {package_spec}"
     )
-    subprocess.check_output(
+    _run_command_with_live_output(
         ["/bin/bash", "-c", cmd],
         env=venv_env,
-        stderr=subprocess.STDOUT,
+        verbose=verbose,
     )
 
 
@@ -505,7 +544,7 @@ def format_container_list(containers: List[Dict[str, Any]], format_type: str = "
             if image_url.startswith("docker://"):
                 image_url = image_url.replace("docker://", "")
             image_url = image_url[:48] if len(image_url) > 48 else image_url
-            version = container.get("image_version", "")[:13]
+            version = str(container.get("image_version", ""))[:13]
             registry = (container.get("image_registry") or "")[:18]
             runtime = container.get("runtime", "")[:10]
 

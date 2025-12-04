@@ -34,6 +34,85 @@ def cli():
     pass
 
 
+def _register_toil(  # pylint: disable=R0917
+    bindir,
+    optdir,
+    pypi_name,
+    pypi_version,
+    python,
+    volumes,
+    tmpvar,
+    image_url,
+    image_user,
+    singularity,
+    container,
+    environment,
+    pre_install,
+    image_registry=None,
+    verbose=True,
+):
+    """Register versioned toil container pipelines in a bin directory (internal function)."""
+    # Normalize volumes to ensure they're in tuple format
+    volumes = utils.normalize_volumes(volumes)
+
+    python = shutil.which(python)
+    if not python:
+        raise click.ClickException("Could not determine the python path.")
+
+    optdir = Path(optdir) / pypi_name / pypi_version
+    bindir = Path(bindir)
+    optexe = optdir / pypi_name
+    binexe = bindir / f"{pypi_name}_{pypi_version}"
+    workdir = f"{tmpvar}/{pypi_name}_{pypi_version}_`uuidgen`"
+
+    # Normalize image URL
+    image_url = utils.normalize_image_url(
+        image_url, container, image_user, pypi_name, pypi_version, image_registry
+    )
+
+    # Setup directories
+    optdir.mkdir(exist_ok=True, parents=True)
+    bindir.mkdir(exist_ok=True, parents=True)
+
+    # Create and setup virtual environment
+    env = f"{environment}__{pypi_name}__{pypi_version}"
+    click.echo(f"Creating virtual environment '{env}'...")
+    utils.create_venv_with_virtualenvwrapper(env, python, environment, verbose=verbose)
+
+    # Install package
+    package_spec = utils.build_package_spec(pypi_name, pypi_version, image_user)
+    
+    click.echo(f"Installing package '{package_spec}'...")
+    pre_install_list = list(pre_install) if pre_install else None
+    utils.install_package_with_virtualenvwrapper(
+        env, package_spec, pre_install=pre_install_list, verbose=verbose
+    )
+
+    # Find executable and build command
+    toolpath = utils.find_executable_in_virtualenvwrapper(env, pypi_name)
+    command_parts = [toolpath, '"$@"']
+
+    if container == "singularity":
+        command_parts.extend(
+            [
+                "--singularity",
+                _get_or_create_image(optdir, singularity, image_url),
+            ]
+        )
+    else:  # docker
+        command_parts.extend(["--docker", image_url])
+
+    command_parts.extend(
+        [
+            " ".join(f"--volumes {i} {j}" for i, j in volumes),
+            "--workDir",
+            workdir,
+        ]
+    )
+
+    utils.create_executable(optexe, binexe, command_parts)
+
+
 @click.command()
 @options.PYPI_NAME
 @options.PYPI_VERSION
@@ -71,71 +150,28 @@ def register_toil(  # pylint: disable=R0917
     container,
     environment,
     pre_install,
-    image_registry=None,
 ):
     """Register versioned toil container pipelines in a bin directory."""
-    # Normalize volumes to ensure they're in tuple format
-    volumes = utils.normalize_volumes(volumes)
-
-    python = shutil.which(python)
-    if not python:
-        raise click.ClickException("Could not determine the python path.")
-
-    optdir = Path(optdir) / pypi_name / pypi_version
-    bindir = Path(bindir)
-    optexe = optdir / pypi_name
-    binexe = bindir / f"{pypi_name}_{pypi_version}"
-    workdir = f"{tmpvar}/{pypi_name}_{pypi_version}_`uuidgen`"
-
-    # Normalize image URL
-    image_url = utils.normalize_image_url(
-        image_url, container, image_user, pypi_name, pypi_version, image_registry
+    _register_toil(
+        pypi_name=pypi_name,
+        pypi_version=pypi_version,
+        bindir=bindir,
+        optdir=optdir,
+        python=python,
+        volumes=volumes,
+        tmpvar=tmpvar,
+        image_url=image_url,
+        image_user=image_user,
+        github_user=github_user,
+        singularity=singularity,
+        container=container,
+        environment=environment,
+        pre_install=pre_install,
+        image_registry=None,
     )
 
-    # Setup directories
-    optdir.mkdir(exist_ok=True, parents=True)
-    bindir.mkdir(exist_ok=True, parents=True)
 
-    # Create and setup virtual environment
-    env = f"{environment}__{pypi_name}__{pypi_version}"
-    click.echo(f"Creating virtual environment '{env}'...")
-    utils.create_venv_with_virtualenvwrapper(env, python, environment)
-
-    # Install package
-    package_spec = utils.build_package_spec(pypi_name, pypi_version, github_user)
-    click.echo(f"Installing package '{package_spec}'...")
-    pre_install_list = list(pre_install) if pre_install else None
-    utils.install_package_with_virtualenvwrapper(
-        env, package_spec, pre_install=pre_install_list
-    )
-
-    # Find executable and build command
-    toolpath = utils.find_executable_in_virtualenvwrapper(env, pypi_name)
-    command_parts = [toolpath]
-
-    if container == "singularity":
-        command_parts.extend(
-            [
-                "--singularity",
-                _get_or_create_image(optdir, singularity, image_url),
-            ]
-        )
-    else:  # docker
-        command_parts.extend(["--docker", image_url])
-
-    command_parts.extend(
-        [
-            " ".join(f"--volumes {i} {j}" for i, j in volumes),
-            "--workDir",
-            workdir,
-            '"$@"',
-        ]
-    )
-
-    utils.create_executable(optexe, binexe, command_parts)
-
-
-def register_image(  # pylint: disable=R0913,R0917
+def _register_image(  # pylint: disable=R0913,R0917
     bindir,
     command,
     force,
@@ -251,7 +287,7 @@ def register_image(  # pylint: disable=R0913,R0917
 @options.NO_HOME
 def register_singularity(singularity, *args, **kwargs):
     """Register versioned singularity command in a bin directory."""
-    register_image(image_type="singularity", runtime=singularity, *args, **kwargs)
+    _register_image(image_type="singularity", runtime=singularity, *args, **kwargs)
 
 
 @click.command()
@@ -270,7 +306,56 @@ def register_singularity(singularity, *args, **kwargs):
 @options.VERSION
 def register_docker(docker, *args, **kwargs):
     """Register versioned docker command in a bin directory."""
-    register_image(image_type="docker", runtime=docker, no_home=False, *args, **kwargs)
+    _register_image(image_type="docker", runtime=docker, no_home=False, *args, **kwargs)
+
+
+def _register_python(  # pylint: disable=R0917
+    pypi_name,
+    pypi_version,
+    github_user,
+    command,
+    bindir,
+    optdir,
+    python,
+    environment,
+    pre_install,
+    verbose=True,
+):
+    """Register versioned python pipelines in a bin directory (internal function)."""
+    python = shutil.which(python)
+    if not python:
+        raise click.ClickException("Could not determine the python path.")
+
+    optdir = Path(optdir) / pypi_name / pypi_version
+    bindir = Path(bindir)
+    optexe = optdir / pypi_name
+    binexe = bindir / (command or f"{pypi_name}_{pypi_version}")
+
+    # Setup directories
+    optdir.mkdir(exist_ok=True, parents=True)
+    bindir.mkdir(exist_ok=True, parents=True)
+
+    # Create and setup virtual environment
+    env = f"{environment}__{pypi_name}__{pypi_version}"
+    
+    click.echo(f"Creating virtual environment '{env}'...")
+    utils.create_venv_with_virtualenvwrapper(env, python, environment, verbose=verbose)
+
+    # Install package
+    package_spec = utils.build_package_spec(pypi_name, pypi_version, github_user)
+    
+    click.echo(f"Installing package '{package_spec}'...")
+    pre_install_list = list(pre_install) if pre_install else None
+    utils.install_package_with_virtualenvwrapper(
+        env, package_spec, pre_install=pre_install_list, verbose=verbose
+    )
+
+    # Find executable and create script
+    command_name = command or pypi_name
+    toolpath = utils.find_executable_in_virtualenvwrapper(env, command_name)
+    cmd = [toolpath, '"$@"']
+
+    utils.create_executable(optexe, binexe, cmd)
 
 
 @click.command()
@@ -303,38 +388,18 @@ def register_python(  # pylint: disable=R0917
     pre_install,
 ):
     """Register versioned python pipelines in a bin directory."""
-    python = shutil.which(python)
-    if not python:
-        raise click.ClickException("Could not determine the python path.")
-
-    optdir = Path(optdir) / pypi_name / pypi_version
-    bindir = Path(bindir)
-    optexe = optdir / pypi_name
-    binexe = bindir / (command or f"{pypi_name}_{pypi_version}")
-
-    # Setup directories
-    optdir.mkdir(exist_ok=True, parents=True)
-    bindir.mkdir(exist_ok=True, parents=True)
-
-    # Create and setup virtual environment
-    env = f"{environment}__{pypi_name}__{pypi_version}"
-    click.echo(f"Creating virtual environment '{env}'...")
-    utils.create_venv_with_virtualenvwrapper(env, python, environment)
-
-    # Install package
-    package_spec = utils.build_package_spec(pypi_name, pypi_version, github_user)
-    click.echo(f"Installing package '{package_spec}'...")
-    pre_install_list = list(pre_install) if pre_install else None
-    utils.install_package_with_virtualenvwrapper(
-        env, package_spec, pre_install=pre_install_list
+    _register_python(
+        pypi_name=pypi_name,
+        pypi_version=pypi_version,
+        github_user=github_user,
+        command=command,
+        bindir=bindir,
+        optdir=optdir,
+        python=python,
+        environment=environment,
+        pre_install=pre_install,
+        verbose=True,
     )
-
-    # Find executable and create script
-    command_name = command or pypi_name
-    toolpath = utils.find_executable_in_virtualenvwrapper(env, command_name)
-    cmd = [toolpath, '"$@"']
-
-    utils.create_executable(optexe, binexe, cmd)
 
 
 def _get_or_create_image(optdir, singularity, image_url):
@@ -398,6 +463,11 @@ def _get_or_create_image(optdir, singularity, image_url):
     is_flag=True,
     help="Overwrite existing targets (overrides defaults.force)",
 )
+@click.option(
+    "--verbose/--no-verbose",
+    default=True,
+    help="Show live output from commands (default: True)",
+)
 def install(
     config_path,
     filter,
@@ -405,6 +475,7 @@ def install(
     continue_on_error,
     verify_after_install,
     force,
+    verbose,
 ):
     """Install apps from YAML configuration file."""
     if isinstance(config_path, bytes):
@@ -443,28 +514,66 @@ def install(
             if verify_after_install:
                 merged["verify_after_install"] = True
 
-            install_app(merged)
+            install_app(merged, verbose=verbose)
             click.secho(f"✓ {app_name} installed successfully", fg="cyan")
 
             # Verify after install if requested
-            should_verify = merged.get("verify_after_install", defaults.get("verify_after_install", False))
+            should_verify = merged.get(
+                "verify_after_install", defaults.get("verify_after_install", False)
+            )
             if should_verify:
                 bindir = Path(merged.get("bindir", defaults.get("bindir")))
-                target = merged.get("target") or merged.get("pypi_name")
-                if target:
+
+                app_type = merged.get("type")
+                target = None
+
+                if app_type == "container":
+                    # Container executables use the target name
+                    target = merged.get("target")
+                elif app_type == "toil":
+                    # Toil executables are named pypi_name_pypi_version
+                    pypi_name = merged.get("pypi_name")
+                    pypi_version = merged.get("pypi_version")
+                    if pypi_name and pypi_version:
+                        target = f"{pypi_name}_{pypi_version}"
+                elif app_type == "python":
+                    # Python executables use command or pypi_name_pypi_version
+                    pypi_name = merged.get("pypi_name")
+                    pypi_version = merged.get("pypi_version")
+                    command = merged.get("command")
+                    if command:
+                        target = command
+                    elif pypi_name and pypi_version:
+                        target = f"{pypi_name}_{pypi_version}"
+
+                if not target:
+                    click.secho(
+                        f"⚠ Skipping verification for {app_name}: could not determine executable name",
+                        fg="yellow",
+                    )
+                else:
                     executable_path = bindir / target
                     verify_cmd = merged.get("verify", defaults.get("verify", "--version"))
-                    click.echo(f"Verifying {app_name}...")
-                    success, output, error = utils.verify_executable(executable_path, verify_cmd)
+                    click.echo(f"Verifying {app_name} ({executable_path})...")
+                    success, output, error = utils.verify_executable(
+                        executable_path, verify_cmd
+                    )
                     if success:
                         if output:
-                            click.secho(f"✓ Verification passed: {output[:100]}", fg="cyan")
+                            click.secho(
+                                f"✓ Verification passed: {output[:100]}", fg="cyan"
+                            )
                         else:
-                            click.secho(f"✓ Verification passed", fg="cyan")
+                            click.secho("✓ Verification passed", fg="cyan")
                     else:
-                        click.secho(f"✗ Verification failed: {error or 'Unknown error'}", fg="red")
+                        click.secho(
+                            f"✗ Verification failed: {error or 'Unknown error'}",
+                            fg="red",
+                        )
                         if not continue_on_error:
-                            raise click.ClickException(f"Verification failed for {app_name}")
+                            raise click.ClickException(
+                                f"Verification failed for {app_name}"
+                            )
         except Exception as e:  # pylint: disable=broad-except
             click.secho(f"✗ Failed to install {app_name}: {e}", fg="red")
             if not continue_on_error:
@@ -500,7 +609,7 @@ def install(
 @click.option(
     "--timeout",
     type=int,
-    default=10,
+    default=60,
     help="Timeout per tool in seconds",
 )
 @click.option(
@@ -549,16 +658,39 @@ def verify(
     for app in apps:
         app_name = _get_app_name(app)
         merged = config.merge_defaults(app, defaults)
-        target = merged.get("target") or merged.get("pypi_name")
+
+        app_type = merged.get("type")
+        target = None
+
+        if app_type == "container":
+            target = merged.get("target")
+        elif app_type == "toil":
+            pypi_name = merged.get("pypi_name")
+            pypi_version = merged.get("pypi_version")
+            if pypi_name and pypi_version:
+                target = f"{pypi_name}_{pypi_version}"
+        elif app_type == "python":
+            pypi_name = merged.get("pypi_name")
+            pypi_version = merged.get("pypi_version")
+            command = merged.get("command")
+            if command:
+                target = command
+            elif pypi_name and pypi_version:
+                target = f"{pypi_name}_{pypi_version}"
 
         if not target:
-            click.secho(f"  ⚠ Skipping {app_name}: no target/pypi_name", fg="yellow")
+            click.secho(
+                f"  ⚠ Skipping {app_name}: could not determine executable name",
+                fg="yellow",
+            )
             continue
 
         executable_path = bindir_path / target
         verify_cmd = merged.get("verify", defaults.get("verify", "--version"))
-        
-        success, output, error = utils.verify_executable(executable_path, verify_cmd, timeout)
+
+        success, output, error = utils.verify_executable(
+            executable_path, verify_cmd, timeout
+        )
         results.append({
             "name": app_name,
             "target": target,
@@ -652,12 +784,13 @@ def list_containers(
         click.echo(output_text)
 
 
-def install_app(app_config: Dict[str, Any]) -> None:  # type: ignore
+def install_app(app_config: Dict[str, Any], verbose: bool = True) -> None:  # type: ignore
     """
     Install a single app based on configuration.
 
     Args:
         app_config: App configuration dictionary with defaults merged.
+        verbose: If True, show live output (default: True).
 
     Raises:
         ValueError: If app type is unknown.
@@ -665,21 +798,21 @@ def install_app(app_config: Dict[str, Any]) -> None:  # type: ignore
     app_type = app_config["type"]
 
     if app_type == "container":
-        install_container_app(app_config)
+        install_container_app(app_config, verbose=verbose)
     elif app_type == "toil":
-        install_toil_app(app_config)
+        install_toil_app(app_config, verbose=verbose)
     elif app_type == "python":
-        install_python_app(app_config)
+        install_python_app(app_config, verbose=verbose)
     else:
         raise ValueError(f"Unknown app type: {app_type}")
 
 
-def install_container_app(app_config: Dict[str, Any]) -> None:  # type: ignore
+def install_container_app(app_config: Dict[str, Any], verbose: bool = False) -> None:  # type: ignore
     """Install a container app."""
     runtime_type = app_config.get("container_runtime", "singularity")
     runtime_path = app_config.get(f"{runtime_type}_path", runtime_type)
 
-    register_image(
+    _register_image(
         bindir=app_config["bindir"],
         optdir=app_config["optdir"],
         target=app_config.get("target"),
@@ -698,41 +831,40 @@ def install_container_app(app_config: Dict[str, Any]) -> None:  # type: ignore
     )
 
 
-def install_toil_app(app_config: Dict[str, Any]) -> None:  # type: ignore
+def install_toil_app(app_config: Dict[str, Any], verbose: bool = True) -> None:  # type: ignore
     """Install a toil app."""
-    register_toil(
+    _register_toil(
         bindir=app_config["bindir"],
         optdir=app_config["optdir"],
         pypi_name=app_config["pypi_name"],
         pypi_version=app_config["pypi_version"],
-        image_url=app_config.get("image_url"),
-        github_user=app_config.get("github_user"),
         python=app_config.get("python", "python3"),
-        container=app_config.get("container", "singularity"),
-        singularity=app_config.get("singularity_path", "singularity"),
-        docker=app_config.get("docker_path", "docker"),
-        tmpvar=app_config.get("tmpvar", "$TMP_DIR"),
         volumes=app_config.get("volumes", []),
+        tmpvar=app_config.get("tmpvar", "$TMP_DIR"),
+        image_url=app_config.get("image_url"),
+        image_user=app_config.get("image_user"),
+        singularity=app_config.get("singularity_path", "singularity"),
+        container=app_config.get("container", "singularity"),
         environment=app_config.get("environment", "development"),
-        force=app_config.get("force", False),
         pre_install=app_config.get("pre_install"),
         image_registry=app_config.get("image_registry"),
+        verbose=verbose,
     )
 
 
-def install_python_app(app_config: Dict[str, Any]) -> None:  # type: ignore
+def install_python_app(app_config: Dict[str, Any], verbose: bool = True) -> None:  # type: ignore
     """Install a python app."""
-    register_python(
-        bindir=app_config["bindir"],
-        optdir=app_config["optdir"],
+    _register_python(
         pypi_name=app_config["pypi_name"],
         pypi_version=app_config["pypi_version"],
         github_user=app_config.get("github_user"),
         command=app_config.get("command"),
+        bindir=app_config["bindir"],
+        optdir=app_config["optdir"],
         python=app_config.get("python", "python3"),
         environment=app_config.get("environment", "development"),
-        force=app_config.get("force", False),
         pre_install=app_config.get("pre_install"),
+        verbose=verbose,
     )
 
 

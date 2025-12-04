@@ -187,9 +187,17 @@ register_apps install --config apps.yaml
 defaults:
   bindir: /example/bin
   optdir: /example/opt
-  container_runtime: singularity
+  container_runtime: singularity  # or docker
   singularity_path: /usr/bin/singularity
-  force: true
+  docker_path: docker
+  volumes:
+    - /data1:/data1
+  tmpvar: $TMP_DIR
+  environment: production
+  force: false  # Overwrite existing targets (default: false)
+  image_registry: quay.io  # Optional: default container registry
+  verify: "--version"  # Default verify command
+  verify_after_install: false  # Verify apps after installation
 
 apps:
   # Container apps
@@ -199,6 +207,20 @@ apps:
     image_repository: mosdepth
     image_version: 0.2.5
     image_url: quay.io/biocontainers/mosdepth:0.2.5--hb763d49_0
+    # Optional per-app overrides:
+    # verify: "--version"  # Override default verify command
+    # verify_after_install: true  # Override default
+    # image_registry: quay.io  # Override default registry
+    # force: true  # Override default
+
+  # Container app with registry
+  - type: container
+    target: svaba
+    command: svaba
+    image_registry: docker.io  # Uses registry/user/repo:version format
+    image_user: papaemmelab
+    image_repository: docker-svaba
+    image_version: v1.0.0
 
   # Toil apps
   - type: toil
@@ -219,13 +241,136 @@ apps:
     python: python3
 ```
 
-**Options:**
+**Install Command Options:**
 - `--config` - Path to YAML configuration file (required)
 - `--filter` - Filter apps by type: `container`, `toil`, `python`, or `all` (default: `all`)
 - `--dry-run` - Preview what would be installed without actually installing
 - `--continue-on-error` - Continue installing other apps if one fails
+- `--verify` / `--verify-after-install` - Verify each app after installation by running its verify command
+- `--force` - Overwrite existing targets (overrides `defaults.force`)
+- `--verbose` / `--no-verbose` - Show live output from commands (default: `--verbose`)
+
+**YAML Schema:**
+
+**Defaults section:**
+- `bindir` - Directory where executable symlinks will be created
+- `optdir` - Directory where containers and scripts will be installed
+- `container_runtime` - Container runtime: `singularity` or `docker` (default: `singularity`)
+- `singularity_path` - Path to singularity executable
+- `docker_path` - Path to docker executable
+- `volumes` - List of volume mappings (format: `["/src:/dest"]` or `["/src"]`)
+- `tmpvar` - Environment variable for work directory (default: `$TMP_DIR`)
+- `environment` - Virtual environment name: `production`, `development`, `testing`, or `staging` (default: `production`)
+- `force` - Overwrite existing targets (default: `false`)
+- `image_registry` - Default container registry (e.g., `quay.io`, `123456789.dkr.ecr.us-east-1.amazonaws.com`)
+- `verify` - Default verify command to run (default: `"--version"`)
+- `verify_after_install` - Verify apps after installation (default: `false`)
+
+**App-specific fields (all apps):**
+- `type` - App type: `container`, `toil`, or `python` (required)
+- `verify` - Verify command (overrides default, e.g., `"--version"`, `"-v"`, `"version"`)
+- `verify_after_install` - Verify after installation (overrides default)
+- `force` - Overwrite existing targets (overrides default)
+
+**Container apps:**
+- `target` - Name of the executable to create (required)
+- `command` - Command to execute inside the container
+- `image_url` - Full image URL (optional if `image_repository` and `image_version` provided)
+- `image_registry` - Container registry (overrides default)
+- `image_user` - Docker hub user/organization
+- `image_repository` - Docker repository name
+- `image_version` - Image version tag
+- `no_home` - Use `--no-home` option for Singularity
+
+**Toil apps:**
+- `pypi_name` - Package name in PyPI (required)
+- `pypi_version` - Package version in PyPI (required)
+- `image_url` - Container image URL
+- `image_registry` - Container registry (overrides default)
+- `image_user` - Docker hub user/organization
+- `github_user` - GitHub user for package
+- `python` - Python interpreter (default: `python3`)
+- `container` - Container runtime: `singularity` or `docker` (default: `singularity`)
+- `pre_install` - List of package specs to install before main package
+
+**Python apps:**
+- `pypi_name` - Package name in PyPI (required)
+- `pypi_version` - Package version in PyPI (required)
+- `github_user` - GitHub user for package
+- `command` - Command name (optional, defaults to `pypi_name`)
+- `python` - Python interpreter (default: `python3`)
 
 See `example_apps.yaml` for a complete example configuration file.
+
+### Verify Installed Apps
+
+You can verify that installed apps work correctly by running their verify commands:
+
+```bash
+register_apps verify --config apps.yaml
+```
+
+**Verify Command Options:**
+- `--config` - Path to YAML configuration file (required)
+- `--bindir` - Override bindir from config (optional)
+- `--filter` - Filter apps by type: `container`, `toil`, `python`, or `all` (default: `all`)
+- `--timeout` - Timeout per tool in seconds (default: `10`)
+- `--continue-on-error` - Continue verifying other apps if one fails
+- `--format` - Output format: `table` or `json` (default: `table`)
+
+The verify command will:
+1. Load apps from the YAML configuration
+2. For each app, run its verify command (default: `--version`) on the installed executable
+3. Report success/failure for each app
+4. Show a summary at the end
+
+**Example output:**
+```
+Verifying 3 apps from /example/bin...
+
+  ✓ mosdepth (--version): v0.2.5
+  ✓ svaba (--version): v1.0.0
+  ✗ some_tool (-v): Command failed with exit code 1
+
+Summary: 2 passed, 1 failed out of 3 apps
+```
+
+### List Container Images
+
+List all container images from your YAML configuration for pulling or migration:
+
+```bash
+register_apps list-containers --config apps.yaml
+```
+
+**List Containers Options:**
+- `--config` - Path to YAML configuration file (required)
+- `--filter` - Filter apps by type: `container`, `toil`, or `all` (default: `container`)
+- `--format` - Output format: `table`, `json`, `yaml`, `pull-commands`, or `migration` (default: `table`)
+- `--output` - Write output to file (optional)
+
+**Output Formats:**
+
+**Table format (default):**
+```
+Name          Image URL                                    Version   Registry      Runtime
+mosdepth      quay.io/biocontainers/mosdepth:0.2.5...     0.2.5     quay.io       singularity
+svaba         papaemmelab/docker-svaba:v1.0.0           v1.0.0    docker.io     singularity
+```
+
+**Pull commands format:**
+```bash
+register_apps list-containers --config apps.yaml --format pull-commands
+# Output:
+docker pull quay.io/biocontainers/mosdepth:0.2.5--hb763d49_0
+docker pull papaemmelab/docker-svaba:v1.0.0
+```
+
+**Migration format (for ECR/registry migration):**
+```bash
+register_apps list-containers --config apps.yaml --format migration --output migration.json
+# Output: JSON with source and target image URLs
+```
 
 ### Environment Variables
 
