@@ -6,12 +6,14 @@
 defaults:
   bindir: /isabl/bin
   optdir: /isabl/local
-  container_runtime: docker
+  container_runtime: singularity
   docker_path: docker
   image_user: papaemmelab
   volumes:
     - /isabl:/isabl
-    - /work:/work
+    - /scratch:/scratch
+    - /data_input:/data_input
+    - /data_output:/data_output
   tmpvar: $TMP_DIR
   environment: development
   force: true
@@ -53,11 +55,11 @@ apps:
     image_version: v1.1.1
 
   - type: container
-    target: click_mergefusions_v1.0.7
+    target: click_mergefusions_v1.1.1
     command: click_mergefusions
-    image_user: papaemmelab
+    image_user: isabl
     image_repository: click_mergefusions
-    image_version: v1.0.7
+    image_version: v1.1.1
 
   - type: container
     target: HemeAutotator
@@ -135,30 +137,30 @@ apps:
     image_repository: msisensor2
     image_version: latest
 
-  - type: container
-    target: docker-circos
-    command: ""
-    image_repository: docker-circos
-    image_version: 1.0.0
+      #- type: container
+      #target: docker-circos
+      #command: ""
+      #image_repository: docker-circos
+      #image_version: 1.0.0
 
-  - type: container
-    target: click_plotcnsv
-    command: ""
-    image_repository: click_plotcnsv
-    image_version: v0.1.0
+      #- type: container
+      #target: click_plotcnsv
+      #command: ""
+      #image_repository: click_plotcnsv
+      #image_version: v0.1.0
 
-  - type: container
-    target: docker-hrdtools
-    command: ""
-    image_repository: docker-hrdtools
-    image_version: v1.0.0
+      #- type: container
+      #target: docker-hrdtools
+      #command: ""
+      #image_repository: docker-hrdtools
+      #image_version: v1.0.0
 
-  - type: container
-    target: click_clone
-    command: click_clone
-    image_user: papaemmelab
-    image_repository: click_clone
-    image_version: 0.2.0
+      #- type: container
+      #target: click_clone
+      #command: click_clone
+      #image_user: papaemmelab
+      #image_repository: click_clone
+      #image_version: 0.2.0
 
   - type: container
     target: genomon_detectITD_v1.0.3
@@ -250,12 +252,12 @@ apps:
     image_repository: docker-hmftools
     image_version: v1.0.0
 
-  - type: container
-    target: arcasHLA
-    command: arcasHLA
-    image_user: papaemmelab
-    image_repository: arcashla
-    image_version: v0.5.0
+      #- type: container
+      #target: arcasHLA
+      #command: arcasHLA
+      #image_user: papaemmelab
+      #image_repository: arcashla
+      #image_version: v0.5.0
 
   - type: container
     target: seq2hla
@@ -271,12 +273,12 @@ apps:
     image_repository: rnaseqqc_1.1.8
     image_version: latest
 
-  - type: container
-    target: ALLSorts
-    command: ALLSorts
-    image_user: papaemmelab
-    image_repository: allsorts
-    image_version: v0.1.0
+      #- type: container
+      #target: ALLSorts
+      #command: ALLSorts
+      #image_user: papaemmelab
+      #image_repository: allsorts
+      #image_version: v0.1.0
 
   - type: container
     target: Allspice
@@ -314,12 +316,12 @@ apps:
     image_repository: purple
     image_version: v0.1.0
 
-  - type: container
-    target: rnacaller
-    command: perl /opt/rnacaller/bin/Flt3Itd.pl
-    image_user: papaemmelab
-    image_repository: rnacaller
-    image_version: v0.1.0
+      #- type: container
+      #target: rnacaller
+      #command: perl /opt/rnacaller/bin/Flt3Itd.pl
+      #image_user: papaemmelab
+      #image_repository: rnacaller
+      #image_version: v0.1.0
 
   # ============================================
   # TOIL APPS
