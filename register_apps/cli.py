@@ -15,6 +15,7 @@ cause problems, the code will get executed twice:
 Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
 
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -76,7 +77,9 @@ def _register_toil(  # pylint: disable=R0917
 
     # Create and setup virtual environment
     env = f"{environment}__{pypi_name}__{pypi_version}"
-    click.echo(f"Creating virtual environment '{env}'...")
+    workon_home = os.getenv("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
+    venv_path = os.path.join(workon_home, env)
+    click.echo(f"Creating virtual environment '{env}' at {venv_path}...")
     utils.create_venv_with_virtualenvwrapper(env, python, environment, verbose=verbose)
 
     # Install package
@@ -337,8 +340,9 @@ def _register_python(  # pylint: disable=R0917
 
     # Create and setup virtual environment
     env = f"{environment}__{pypi_name}__{pypi_version}"
-    
-    click.echo(f"Creating virtual environment '{env}'...")
+    workon_home = os.getenv("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
+    venv_path = os.path.join(workon_home, env)
+    click.echo(f"Creating virtual environment '{env}' at {venv_path}...")
     utils.create_venv_with_virtualenvwrapper(env, python, environment, verbose=verbose)
 
     # Install package

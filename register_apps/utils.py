@@ -54,7 +54,7 @@ def get_virtualenvwrapper_script():
         os.path.expanduser("~/.local/bin/virtualenvwrapper.sh"),
     ]
 
-    # Also try to find via which
+    # Also try to find via which (but skip pyenv shims as they can cause hangs)
     if is_executable_available("virtualenvwrapper.sh"):
         result = subprocess.run(
             ["which", "virtualenvwrapper.sh"],
@@ -63,7 +63,10 @@ def get_virtualenvwrapper_script():
             check=False,
         )
         if result.returncode == 0:
-            possible_paths.insert(0, result.stdout.decode("utf-8").strip())
+            which_path = result.stdout.decode("utf-8").strip()
+            # Skip pyenv shims - they cause hangs with virtualenvwrapper
+            if "pyenv/shims" not in which_path:
+                possible_paths.insert(0, which_path)
 
     for path in possible_paths:
         if path and os.path.exists(path):
@@ -75,19 +78,19 @@ def get_virtualenvwrapper_script():
     )
 
 
-def _get_virtualenvwrapper_env():
+def _get_virtualenvwrapper_env(python_interpreter=None):
     """Get environment variables for virtualenvwrapper commands."""
     venv_env = os.environ.copy()
     venv_env.setdefault("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
-    venv_env["VIRTUALENVWRAPPER_PYTHON"] = sys.executable
+    venv_env["VIRTUALENVWRAPPER_PYTHON"] = python_interpreter or sys.executable
     return venv_env
 
 
-def _build_virtualenvwrapper_cmd(script_path, command):
+def _build_virtualenvwrapper_cmd(script_path, command, python_interpreter=None):
     """Build a bash command to run with virtualenvwrapper sourced."""
-    venv_env = _get_virtualenvwrapper_env()
+    venv_env = _get_virtualenvwrapper_env(python_interpreter)
     return (
-        f"export VIRTUALENVWRAPPER_PYTHON={sys.executable} && "
+        f"export VIRTUALENVWRAPPER_PYTHON={venv_env['VIRTUALENVWRAPPER_PYTHON']} && "
         f"export WORKON_HOME={venv_env['WORKON_HOME']} && "
         f"source {script_path} && {command}"
     )
@@ -169,12 +172,14 @@ def create_venv_with_virtualenvwrapper(
     """
     virtualenvwrapper_script = get_virtualenvwrapper_script()
     cmd = _build_virtualenvwrapper_cmd(
-        virtualenvwrapper_script, f"mkvirtualenv -p {python_interpreter} {env_name}"
+        virtualenvwrapper_script,
+        f"mkvirtualenv -p {python_interpreter} {env_name}",
+        python_interpreter,
     )
 
     _run_command_with_live_output(
         ["/bin/bash", "-c", cmd],
-        env=_get_virtualenvwrapper_env(),
+        env=_get_virtualenvwrapper_env(python_interpreter),
         verbose=verbose,
     )
 
@@ -201,7 +206,7 @@ def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=N
     if pre_install:
         for pre_pkg in pre_install:
             cmd = _build_virtualenvwrapper_cmd(
-                virtualenvwrapper_script, f"workon {env_name} && pip3 install {pre_pkg}"
+                virtualenvwrapper_script, f"workon {env_name} && pip install {pre_pkg}"
             )
             _run_command_with_live_output(
                 ["/bin/bash", "-c", cmd],
