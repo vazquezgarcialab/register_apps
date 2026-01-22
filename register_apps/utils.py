@@ -206,7 +206,7 @@ def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=N
     if pre_install:
         for pre_pkg in pre_install:
             cmd = _build_virtualenvwrapper_cmd(
-                virtualenvwrapper_script, f"workon {env_name} && pip install {pre_pkg}"
+                virtualenvwrapper_script, f"workon {env_name} && pip install '{pre_pkg}'"
             )
             _run_command_with_live_output(
                 ["/bin/bash", "-c", cmd],
@@ -216,7 +216,7 @@ def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=N
 
     # Install main package
     cmd = _build_virtualenvwrapper_cmd(
-        virtualenvwrapper_script, f"workon {env_name} && pip install {package_spec}"
+        virtualenvwrapper_script, f"workon {env_name} && pip install '{package_spec}'"
     )
     _run_command_with_live_output(
         ["/bin/bash", "-c", cmd],

@@ -334,6 +334,7 @@ apps:
     python: python2
     container: docker
     pre_install:
+      - "Unidecode<1.2"
       - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
       - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
 
@@ -345,6 +346,7 @@ apps:
     python: python2
     container: docker
     pre_install:
+      - "Unidecode<1.2"
       - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
       - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
 
@@ -356,6 +358,7 @@ apps:
     python: python2
     container: docker
     pre_install:
+      - "Unidecode<1.2"
       - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
       - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
 
@@ -389,6 +392,7 @@ apps:
     python: python2
     container: docker
     pre_install:
+      - "Unidecode<1.2"
       - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
       - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
 
@@ -411,6 +415,7 @@ apps:
     python: python2
     container: docker
     pre_install:
+      - "Unidecode<1.2"
       - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
       - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
 
@@ -433,6 +438,7 @@ apps:
     python: python2
     container: docker
     pre_install:
+      - "Unidecode<1.2"
       - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
       - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
 
@@ -511,6 +517,7 @@ apps:
     python: python2
     container: docker
     pre_install:
+      - "Unidecode<1.2"
       - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
       - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
       - git+https://github.com/papaemmelab/toil_cvflag@v0.4.0#eggs=toil_cvflag
