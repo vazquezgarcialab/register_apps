@@ -461,6 +461,7 @@ apps:
     python: python3
     container: docker
     pre_install:
+      - "setuptools<81"
       - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
       - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
 

@@ -64,8 +64,6 @@ def _register_toil(  # pylint: disable=R0917
     bindir = Path(bindir)
     optexe = optdir / pypi_name
     binexe = bindir / f"{pypi_name}_{pypi_version}"
-    workdir = f"{tmpvar}/{pypi_name}_{pypi_version}_`uuidgen`"
-
     # Normalize image URL
     image_url = utils.normalize_image_url(
         image_url, container, image_user, pypi_name, pypi_version, image_registry
@@ -93,6 +91,11 @@ def _register_toil(  # pylint: disable=R0917
 
     # Find executable and build command
     toolpath = utils.find_executable_in_virtualenvwrapper(env, pypi_name)
+
+    # Build workdir path expression
+    workdir_path = f"{tmpvar}/{pypi_name}_{pypi_version}_$(uuidgen)"
+
+    # Build the main command
     command_parts = [toolpath, '"$@"']
 
     if container == "singularity":
@@ -109,11 +112,11 @@ def _register_toil(  # pylint: disable=R0917
         [
             " ".join(f"--volumes {i} {j}" for i, j in volumes),
             "--workDir",
-            workdir,
+            '"$_workdir"',
         ]
     )
 
-    utils.create_executable(optexe, binexe, command_parts)
+    utils.create_executable_with_workdir(optexe, binexe, command_parts, workdir_path)
 
 
 @click.command()

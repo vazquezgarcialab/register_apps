@@ -386,6 +386,47 @@ def create_executable(optexe: Path, binexe: Path, command_parts: List[str]) -> N
         raise click.ClickException(f"Failed to create executable: {e}") from e
 
 
+def create_executable_with_workdir(
+    optexe: Path, binexe: Path, command_parts: List[str], workdir_path: str
+) -> None:
+    """
+    Create executable script with workdir setup and symlink.
+
+    Creates a script that:
+    1. Stores the workdir path in a variable
+    2. Creates the directory with mkdir -p
+    3. Runs the command with --workDir referencing the variable
+
+    Args:
+        optexe: Path to the executable script.
+        binexe: Path to the symlink.
+        command_parts: List of command parts to join.
+        workdir_path: The workdir path expression (e.g., "${TMP_DIR}/app_$(uuidgen)").
+
+    Raises:
+        click.ClickException: If file operations fail.
+    """
+    click.echo("Creating and linking executable...")
+    try:
+        script_content = f'''#!/bin/bash
+
+_workdir="{workdir_path}"
+
+mkdir -p "$_workdir" || {{ echo "Failed to create $_workdir" >&2; exit 1; }}
+
+{' '.join(str(part) for part in command_parts)}
+'''
+        optexe.write_text(script_content)
+        optexe.chmod(mode=0o755)
+        force_symlink(optexe, binexe)
+        click.secho(
+            f"\nExecutables available at:\n" f"\n\t{str(optexe)}\n\t{str(binexe)}\n",
+            fg="green",
+        )
+    except OSError as e:
+        raise click.ClickException(f"Failed to create executable: {e}") from e
+
+
 def verify_executable(
     executable_path: Path, verify_cmd: str = "--version", timeout: int = 60
 ) -> Tuple[bool, str, Optional[str]]:
