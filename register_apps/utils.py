@@ -202,7 +202,8 @@ def create_venv_with_virtualenvwrapper(
 
 
 def install_package_with_virtualenvwrapper(
-    env_name, package_spec, pre_install=None, no_build_isolation=False, verbose=True
+    env_name, package_spec, pre_install=None, no_build_isolation=False,
+    no_deps=False, verbose=True
 ):
     """
     Install package in virtualenvwrapper environment.
@@ -215,6 +216,9 @@ def install_package_with_virtualenvwrapper(
         no_build_isolation: If True, pass --no-build-isolation to pip install.
             Useful when pre_install pins a build dependency (e.g. setuptools)
             that must be used instead of pip's isolated build environment.
+        no_deps: If True, pass --no-deps to pip install for the main package.
+            Useful when dependencies are handled via pre_install with compatible
+            versions that differ from the package's strict pins.
         verbose: If True, show live output (default: True).
 
     Raises:
@@ -224,7 +228,11 @@ def install_package_with_virtualenvwrapper(
     virtualenvwrapper_script = get_virtualenvwrapper_script()
     venv_env = _get_virtualenvwrapper_env()
 
-    pip_flags = " --no-build-isolation" if no_build_isolation else ""
+    pip_flags = ""
+    if no_build_isolation:
+        pip_flags += " --no-build-isolation"
+    if no_deps:
+        pip_flags += " --no-deps"
 
     # Install pre-install packages if specified
     if pre_install:

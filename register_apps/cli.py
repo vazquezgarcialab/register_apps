@@ -51,6 +51,7 @@ def _register_toil(  # pylint: disable=R0917
     pre_install,
     image_registry=None,
     no_build_isolation=False,
+    no_deps=False,
     verbose=True,
 ):
     """Register versioned toil container pipelines in a bin directory (internal function)."""
@@ -88,7 +89,8 @@ def _register_toil(  # pylint: disable=R0917
     pre_install_list = list(pre_install) if pre_install else None
     utils.install_package_with_virtualenvwrapper(
         env, package_spec, pre_install=pre_install_list,
-        no_build_isolation=no_build_isolation, verbose=verbose,
+        no_build_isolation=no_build_isolation, no_deps=no_deps,
+        verbose=verbose,
     )
 
     # Find executable and build command
@@ -328,6 +330,7 @@ def _register_python(  # pylint: disable=R0917
     environment,
     pre_install,
     no_build_isolation=False,
+    no_deps=False,
     verbose=True,
 ):
     """Register versioned python pipelines in a bin directory (internal function)."""
@@ -358,7 +361,8 @@ def _register_python(  # pylint: disable=R0917
     pre_install_list = list(pre_install) if pre_install else None
     utils.install_package_with_virtualenvwrapper(
         env, package_spec, pre_install=pre_install_list,
-        no_build_isolation=no_build_isolation, verbose=verbose,
+        no_build_isolation=no_build_isolation, no_deps=no_deps,
+        verbose=verbose,
     )
 
     # Find executable and create script
@@ -860,6 +864,7 @@ def install_toil_app(app_config: Dict[str, Any], verbose: bool = True) -> None: 
         pre_install=app_config.get("pre_install"),
         image_registry=app_config.get("image_registry"),
         no_build_isolation=app_config.get("no_build_isolation", False),
+        no_deps=app_config.get("no_deps", False),
         verbose=verbose,
     )
 
@@ -877,6 +882,7 @@ def install_python_app(app_config: Dict[str, Any], verbose: bool = True) -> None
         environment=app_config.get("environment", "development"),
         pre_install=app_config.get("pre_install"),
         no_build_isolation=app_config.get("no_build_isolation", False),
+        no_deps=app_config.get("no_deps", False),
         verbose=verbose,
     )
 
