@@ -177,11 +177,28 @@ def create_venv_with_virtualenvwrapper(
         python_interpreter,
     )
 
-    _run_command_with_live_output(
-        ["/bin/bash", "-c", cmd],
-        env=_get_virtualenvwrapper_env(python_interpreter),
-        verbose=verbose,
-    )
+    workon_home = os.getenv("WORKON_HOME", os.path.expanduser("~/.virtualenvs"))
+    venv_path = os.path.join(workon_home, env_name)
+
+    try:
+        _run_command_with_live_output(
+            ["/bin/bash", "-c", cmd],
+            env=_get_virtualenvwrapper_env(python_interpreter),
+            verbose=verbose,
+        )
+    except subprocess.CalledProcessError:
+        # mkvirtualenv can fail due to virtualenvwrapper hook_loader errors
+        # even though the venv was created successfully. Check if the venv
+        # actually exists before propagating the error.
+        venv_python = os.path.join(venv_path, "bin", "python")
+        if os.path.isfile(venv_python):
+            click.echo(
+                f"Warning: mkvirtualenv returned an error but the virtual "
+                f"environment '{env_name}' was created successfully. "
+                f"Continuing..."
+            )
+        else:
+            raise
 
 
 def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=None, verbose=True):
