@@ -201,7 +201,9 @@ def create_venv_with_virtualenvwrapper(
             raise
 
 
-def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=None, verbose=True):
+def install_package_with_virtualenvwrapper(
+    env_name, package_spec, pre_install=None, no_build_isolation=False, verbose=True
+):
     """
     Install package in virtualenvwrapper environment.
 
@@ -210,6 +212,9 @@ def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=N
         package_spec: Package specification (e.g., 'package==1.0.0' or
                      'git+https://github.com/user/repo@tag#egg=package').
         pre_install: Optional list of package specs to install before main package.
+        no_build_isolation: If True, pass --no-build-isolation to pip install.
+            Useful when pre_install pins a build dependency (e.g. setuptools)
+            that must be used instead of pip's isolated build environment.
         verbose: If True, show live output (default: True).
 
     Raises:
@@ -218,6 +223,8 @@ def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=N
     """
     virtualenvwrapper_script = get_virtualenvwrapper_script()
     venv_env = _get_virtualenvwrapper_env()
+
+    pip_flags = " --no-build-isolation" if no_build_isolation else ""
 
     # Install pre-install packages if specified
     if pre_install:
@@ -233,7 +240,7 @@ def install_package_with_virtualenvwrapper(env_name, package_spec, pre_install=N
 
     # Install main package
     cmd = _build_virtualenvwrapper_cmd(
-        virtualenvwrapper_script, f"workon {env_name} && pip install '{package_spec}'"
+        virtualenvwrapper_script, f"workon {env_name} && pip install{pip_flags} '{package_spec}'"
     )
     _run_command_with_live_output(
         ["/bin/bash", "-c", cmd],

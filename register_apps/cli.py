@@ -50,6 +50,7 @@ def _register_toil(  # pylint: disable=R0917
     environment,
     pre_install,
     image_registry=None,
+    no_build_isolation=False,
     verbose=True,
 ):
     """Register versioned toil container pipelines in a bin directory (internal function)."""
@@ -86,7 +87,8 @@ def _register_toil(  # pylint: disable=R0917
     click.echo(f"Installing package '{package_spec}'...")
     pre_install_list = list(pre_install) if pre_install else None
     utils.install_package_with_virtualenvwrapper(
-        env, package_spec, pre_install=pre_install_list, verbose=verbose
+        env, package_spec, pre_install=pre_install_list,
+        no_build_isolation=no_build_isolation, verbose=verbose,
     )
 
     # Find executable and build command
@@ -325,6 +327,7 @@ def _register_python(  # pylint: disable=R0917
     python,
     environment,
     pre_install,
+    no_build_isolation=False,
     verbose=True,
 ):
     """Register versioned python pipelines in a bin directory (internal function)."""
@@ -354,7 +357,8 @@ def _register_python(  # pylint: disable=R0917
     click.echo(f"Installing package '{package_spec}'...")
     pre_install_list = list(pre_install) if pre_install else None
     utils.install_package_with_virtualenvwrapper(
-        env, package_spec, pre_install=pre_install_list, verbose=verbose
+        env, package_spec, pre_install=pre_install_list,
+        no_build_isolation=no_build_isolation, verbose=verbose,
     )
 
     # Find executable and create script
@@ -855,6 +859,7 @@ def install_toil_app(app_config: Dict[str, Any], verbose: bool = True) -> None: 
         environment=app_config.get("environment", "development"),
         pre_install=app_config.get("pre_install"),
         image_registry=app_config.get("image_registry"),
+        no_build_isolation=app_config.get("no_build_isolation", False),
         verbose=verbose,
     )
 
@@ -871,6 +876,7 @@ def install_python_app(app_config: Dict[str, Any], verbose: bool = True) -> None
         python=app_config.get("python", "python3"),
         environment=app_config.get("environment", "development"),
         pre_install=app_config.get("pre_install"),
+        no_build_isolation=app_config.get("no_build_isolation", False),
         verbose=verbose,
     )
 
