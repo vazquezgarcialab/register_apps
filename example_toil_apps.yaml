@@ -1,0 +1,293 @@
+# Example YAML configuration for register_apps
+# This replaces the long bash script with a clean, maintainable YAML file
+
+# Global defaults - can be overridden per app
+
+defaults:
+  bindir: /isabl/bin
+  optdir: /isabl/local
+  container_runtime: singularity
+  docker_path: docker
+  image_user: papaemmelab
+  volumes:
+    - /isabl:/isabl
+    - /scratch:/scratch
+    - /data_input:/data_input
+    - /data_output:/data_output
+  tmpvar: $TMP_DIR
+  environment: development
+  force: true
+  verify: "--version"
+  verify_after_install: false
+
+# List of apps to install
+apps:
+
+  # ============================================
+  # TOIL APPS
+  # ============================================
+  - type: toil
+    pypi_name: toil_battenberg
+    pypi_version: v1.0.7
+    image_url: docker://papaemmelab/toil_battenberg:v1.0.7
+    github_user: papaemmelab
+    python: /isabl/local/pyenv/versions/2.7.15/bin/python2 
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_brass
+    pypi_version: v1.0.2
+    image_url: docker://papaemmelab/toil_brass:v1.0.2
+    github_user: papaemmelab
+    python: /isabl/local/pyenv/versions/2.7.15/bin/python2
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_brass
+    pypi_version: v1.2.0
+    image_url: docker://papaemmelab/toil_brass:v1.2.0
+    github_user: papaemmelab
+    python: /isabl/local/pyenv/versions/2.7.15/bin/python2
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
+
+        #- type: toil
+        #pypi_name: toil_unmatched_cnvkit
+        #pypi_version: v1.0.0
+        #image_url: docker://papaemmelab/toil_unmatched_cnvkit:v1.0.0
+        #github_user: papaemmelab
+        #python: python3
+        #container: singularity
+        #pre_install:
+        #- 'Unidecode<1.2'
+        #- git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+        #- git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_pindel
+    pypi_version: v1.2.0
+    image_url: docker://papaemmelab/toil_pindel:v1.2.0
+    github_user: papaemmelab
+    python: python3
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_disambiguate
+    pypi_version: v1.1.1
+    image_url: docker://papaemmelab/toil_disambiguate:v1.1.1
+    github_user: papaemmelab
+    python: /isabl/local/pyenv/versions/2.7.15/bin/python2
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_mutect
+    pypi_version: v1.2.10
+    image_url: docker://papaemmelab/toil_mutect:v1.2.10
+    github_user: papaemmelab
+    python: python3
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_mutect
+    pypi_version: v1.2.7
+    image_url: docker://papaemmelab/toil_mutect:v1.2.7
+    github_user: papaemmelab
+    python: /isabl/local/pyenv/versions/2.7.15/bin/python2
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_strelka
+    pypi_version: v1.0.9
+    image_url: docker://papaemmelab/toil_strelka:v1.0.9
+    github_user: papaemmelab
+    python: python3
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_conpair
+    pypi_version: v1.0.4
+    image_url: docker://papaemmelab/toil_conpair:v1.0.4
+    github_user: papaemmelab
+    python: /isabl/local/pyenv/versions/2.7.15/bin/python2
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_freebayes
+    pypi_version: v0.2.0
+    image_url: docker://papaemmelab/toil_freebayes:v0.2.0
+    python: python3
+    github_user: papaemmelab
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_mergevcfs
+    pypi_version: v0.12.0
+    image_url: docker://papaemmelab/toil_mergevcfs:v0.12.0
+    github_user: papaemmelab
+    python: python3
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_mergevcfs
+    pypi_version: v0.13.2
+    image_url: docker://papaemmelab/toil_mergevcfs:v0.13.2
+    github_user: papaemmelab
+    python: python3
+    container: singularity
+    pre_install:
+      - 'setuptools<81'
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_cvflag
+    pypi_version: v0.3.0
+    image_url: docker://papaemmelab/toil_cvflag:v0.3.0
+    github_user: papaemmelab
+    python: python3
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_somalier
+    pypi_version: v0.1.0
+    image_url: docker://papaemmelab/toil_somalier:v0.1.0
+    github_user: papaemmelab
+    python: python3
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_ace
+    pypi_version: v1.0.2
+    image_url: docker://papaemmelab/toil_ace:v1.0.2
+    github_user: papaemmelab
+    python: python3
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
+  # Special cases with pre-install steps
+  - type: toil
+    pypi_name: toil_caveman
+    pypi_version: v1.0.6
+    image_url: docker://papaemmelab/toil_caveman:v1.0.6
+    github_user: papaemmelab
+    python: /isabl/local/pyenv/versions/2.7.15/bin/python2
+    container: singularity
+    pre_install:
+      - 'Unidecode<1.2'
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
+      - git+https://github.com/papaemmelab/toil_cvflag@v0.4.0#eggs=toil_cvflag
+
+  # - type: toil
+  #   pypi_name: toil_cnvkit
+  #   pypi_version: v1.0.0
+  #   image_url: docker://papaemmelab/toil_cnvkit:v1.0.0
+  #   github_user: papaemmelab
+  #   python: /isabl/local/pyenv/versions/2.7.15/bin/python2
+  #   container: docker
+  #   pre_install:
+  #     - numpy==1.9
+  #     - biopython==1.62
+
+  # ============================================
+  # PYTHON APPS
+  # ============================================
+
+  - type: python
+    pypi_name: click_annotsv
+    pypi_version: v1.0.1
+    github_user: papaemmelab
+    python: python3
+
+  - type: python
+    pypi_name: click_annotsv_unmatched
+    pypi_version: v1.2.0
+    github_user: papaemmelab
+    python: python3
+
+  - type: python
+    pypi_name: click_annotvcf
+    pypi_version: v1.0.9
+    github_user: papaemmelab
+    python: python3
+
+  - type: python
+    pypi_name: click_annotvcf
+    pypi_version: v1.2.2
+    github_user: papaemmelab
+    python: python3
+
+  - type: python
+    pypi_name: click_annotvcf
+    pypi_version: v1.3.1
+    github_user: papaemmelab
+    python: python3
+
+  - type: python
+    pypi_name: toil_hla
+    pypi_version: v1.0.0
+    github_user: papaemmelab
+    python: python3
+
+  # Note: click_wgspost and click_egreport are skipped in original script
+  # They can be added here when ready:
+  # - type: python
+  #   pypi_name: click_wgspost
+  #   pypi_version: v1.4.5
+  #   github_user: papaemmelab
+  #   python: python3

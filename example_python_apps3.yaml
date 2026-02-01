@@ -1,0 +1,99 @@
+# Example YAML configuration for register_apps
+# This replaces the long bash script with a clean, maintainable YAML file
+
+# Global defaults - can be overridden per app
+
+defaults:
+  bindir: /isabl/bin
+  optdir: /isabl/local
+  container_runtime: singularity
+  docker_path: docker
+  image_user: papaemmelab
+  volumes:
+    - /isabl:/isabl
+    - /scratch:/scratch
+    - /data_input:/data_input
+    - /data_output:/data_output
+  tmpvar: $TMP_DIR
+  environment: development
+  force: true
+  verify: "--version"
+  verify_after_install: false
+
+# List of apps to install
+apps:
+
+  # ============================================
+  # TOIL APPS
+  # ============================================
+
+
+  # - type: toil
+  #   pypi_name: toil_cnvkit
+  #   pypi_version: v1.0.0
+  #   image_url: docker://papaemmelab/toil_cnvkit:v1.0.0
+  #   github_user: papaemmelab
+  #   python: /isabl/local/pyenv/versions/2.7.15/bin/python2
+  #   container: docker
+  #   pre_install:
+  #     - numpy==1.9
+  #     - biopython==1.62
+
+  # ============================================
+  # PYTHON APPS
+  # ============================================
+
+  - type: python
+    pypi_name: click_annotsv
+    pypi_version: v1.0.1
+    github_user: papaemmelab
+    python: python3
+
+      #- type: python
+      #pypi_name: click_annotsv_unmatched
+      #pypi_version: v1.2.0
+      #github_user: papaemmelab
+      #python: python3
+      #pre_install:
+      #- "setuptools<81"
+
+  #- type: python
+  #  pypi_name: click_annotvcf
+  #  pypi_version: v1.0.9
+  #  github_user: papaemmelab
+  #  python: python3
+  #  pre_install:
+  #   - "pip==20.3.4"
+    #  - "setuptools<58"
+    #  - "pip<24.1"
+    #no_build_isolation: true
+
+  #- type: python
+  #  pypi_name: click_annotvcf
+  #  pypi_version: v1.2.2
+  #  github_user: papaemmelab
+  #  python: python3
+
+  - type: python
+    pypi_name: click_annotvcf
+    pypi_version: v1.3.1
+    github_user: papaemmelab
+    python: python3
+
+  - type: python
+    pypi_name: toil_hla
+    pypi_version: v1.0.0
+    github_user: papaemmelab
+    python: python3
+
+  # Note: click_wgspost and click_egreport are skipped in original script
+  # They can be added here when ready:
+  - type: python
+    pypi_name: click_wgspost
+    pypi_version: v1.4.5
+    github_user: papaemmelab
+    python: python3
+    pre_install:
+      - "cython<3"
+      - "setuptools<58"
+    no_build_isolation: true

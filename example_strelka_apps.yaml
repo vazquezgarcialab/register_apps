@@ -1,0 +1,135 @@
+# Example YAML configuration for register_apps
+# This replaces the long bash script with a clean, maintainable YAML file
+
+# Global defaults - can be overridden per app
+
+defaults:
+  bindir: /isabl/bin
+  optdir: /isabl/local
+  container_runtime: singularity
+  docker_path: docker
+  image_user: papaemmelab
+  volumes:
+    - /isabl:/isabl
+    - /scratch:/scratch
+    - /data_input:/data_input
+    - /data_output:/data_output
+  tmpvar: $TMP_DIR
+  environment: development
+  force: true
+  verify: "--version"
+  verify_after_install: false
+
+# List of apps to install
+apps:
+  # ============================================
+  # CONTAINER APPS
+  # ============================================
+
+
+  # ============================================
+  # TOIL APPS
+  # ============================================
+  - type: toil
+    pypi_name: toil_battenberg
+    pypi_version: v1.0.7
+    image_url: docker://papaemmelab/toil_battenberg:v1.0.7
+    github_user: papaemmelab
+    python: python
+    #python: /isabl/local/pyenv/versions/2.7.15/bin/python2
+    container_runtime: singularity
+    container: singularity
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
+
+        #- type: toil
+        #pypi_name: toil_brass
+        #pypi_version: v1.0.2
+        #image_url: docker://papaemmelab/toil_brass:v1.0.2
+        #github_user: papaemmelab
+        #python: python
+        #container: singularity
+        #pre_install:
+        #- git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+        #- git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_brass
+    pypi_version: v1.2.0
+    image_url: docker://papaemmelab/toil_brass:v1.2.0
+    github_user: papaemmelab
+    python: python
+    container: singularity
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_unmatched_cnvkit
+    pypi_version: v1.0.0
+    image_url: docker://papaemmelab/toil_unmatched_cnvkit:v1.0.0
+    github_user: papaemmelab
+    python: python
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_pindel
+    pypi_version: v1.2.0
+    image_url: docker://papaemmelab/toil_pindel:v1.2.0
+    github_user: papaemmelab
+    python: python
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_disambiguate
+    pypi_version: v1.1.1
+    image_url: docker://papaemmelab/toil_disambiguate:v1.1.1
+    github_user: papaemmelab
+    python: python
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_mutect
+    pypi_version: v1.2.10
+    image_url: docker://papaemmelab/toil_mutect:v1.2.10
+    github_user: papaemmelab
+    python: python
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
+  - type: toil
+    pypi_name: toil_mutect
+    pypi_version: v1.2.7
+    image_url: docker://papaemmelab/toil_mutect:v1.2.7
+    github_user: papaemmelab
+    python: python
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-3.25.0#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v1.1.8#eggs=toil_container
+
+
+    ###################
+  - type: toil
+    pypi_name: toil_strelka
+    pypi_version: v1.0.9
+    image_url: docker://papaemmelab/toil_strelka:v1.0.9
+    github_user: papaemmelab
+    python: python
+    container: docker
+    pre_install:
+      - git+https://github.com/papaemmelab/toil@custom-5.5.1#eggs=toil
+      - git+https://github.com/papaemmelab/toil_container@v2.0.3#eggs=toil_container
+
