@@ -237,8 +237,30 @@ def install_package_with_virtualenvwrapper(
     # Install pre-install packages if specified
     if pre_install:
         for pre_pkg in pre_install:
+            # Support per-item pip flags: if the item starts with -- flags,
+            # extract them and pass to pip. E.g. "--no-deps pysam>=0.19"
+            item_flags = ""
+            pkg_spec = pre_pkg
+            if pre_pkg.startswith("--"):
+                # Split flags from package spec
+                parts = pre_pkg.split(maxsplit=1)
+                if len(parts) == 2 and not parts[1].startswith("--"):
+                    item_flags = parts[0] + " "
+                    pkg_spec = parts[1]
+                else:
+                    # Multiple flags or just flags - find where package starts
+                    tokens = pre_pkg.split()
+                    flag_tokens = []
+                    for i, token in enumerate(tokens):
+                        if token.startswith("--"):
+                            flag_tokens.append(token)
+                        else:
+                            pkg_spec = " ".join(tokens[i:])
+                            break
+                    item_flags = " ".join(flag_tokens) + " " if flag_tokens else ""
+
             cmd = _build_virtualenvwrapper_cmd(
-                virtualenvwrapper_script, f"workon {env_name} && pip install '{pre_pkg}'"
+                virtualenvwrapper_script, f"workon {env_name} && pip install {item_flags}'{pkg_spec}'"
             )
             _run_command_with_live_output(
                 ["/bin/bash", "-c", cmd],
