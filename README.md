@@ -15,7 +15,7 @@ This package is available at [PyPi][pypi_base]:
 
     pip install register_apps
     # or with the latest version
-    pip install git+https://github.com/papaemmelab/register_apps.git#egg=register_apps
+    pip install git+https://github.com/vazquezgarcialab/register_apps.git#egg=register_apps
 
 ## Usage
 
